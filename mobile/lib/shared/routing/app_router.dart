@@ -17,14 +17,18 @@ import '../../features/owner/owner_payout_page.dart';
 import '../../features/owner/owner_qr_scan_page.dart';
 import '../../features/owner/owner_reports_page.dart';
 import '../../features/owner/owner_shell.dart';
+import '../../features/owner/owner_staff_invite_page.dart';
+import '../../features/owner/owner_staff_page.dart';
 import '../../features/owner/owner_venue_create_page.dart';
 import '../../features/owner/owner_venue_edit_page.dart';
 import '../../features/owner/owner_walk_in_page.dart';
 import '../../features/splash/onboarding_page.dart';
 import '../../features/splash/splash_page.dart';
 import '../../features/staff/staff_booking_detail_page.dart';
+import '../../features/staff/staff_pricing_page.dart';
 import '../../features/staff/staff_qr_scan_page.dart';
 import '../../features/staff/staff_shell.dart';
+import '../../features/staff/staff_team_page.dart';
 import '../../features/customer/venues/venue_detail_page.dart';
 import '../../features/customer/venues/venues_page.dart';
 import 'route_paths.dart';
@@ -75,6 +79,14 @@ final appRouter = GoRouter(
       builder: (_, __) => const OwnerVenueCreatePage(),
     ),
     GoRoute(
+      path: RoutePaths.ownerStaff,
+      builder: (_, __) => const OwnerStaffPage(),
+    ),
+    GoRoute(
+      path: RoutePaths.ownerStaffInvite,
+      builder: (_, __) => const OwnerStaffInvitePage(),
+    ),
+    GoRoute(
       path: RoutePaths.ownerVenueEditParam,
       builder: (_, state) => OwnerVenueEditPage(id: state.pathParameters['id']!),
     ),
@@ -87,6 +99,8 @@ final appRouter = GoRouter(
     // STAFF
     GoRoute(path: RoutePaths.staff, builder: (_, __) => const StaffShell()),
     GoRoute(path: RoutePaths.staffQrScan, builder: (_, __) => const StaffQrScanPage()),
+    GoRoute(path: RoutePaths.staffPricing, builder: (_, __) => const StaffPricingPage()),
+    GoRoute(path: RoutePaths.staffTeam, builder: (_, __) => const StaffTeamPage()),
     GoRoute(
       path: RoutePaths.staffBookingDetailParam,
       builder: (_, state) =>

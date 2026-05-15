@@ -160,8 +160,9 @@ class OwnerAccountTab extends StatelessWidget {
             icon: Icons.groups_outlined,
             color: AppColors.accent,
             title: 'Nhân viên',
-            subtitle: '3 staff đang trực',
-            onTap: () {},
+            subtitle:
+                '${MockData.ownerStaffList.where((s) => s.status == StaffStatus.active).length} đang trực · ${MockData.ownerStaffList.length} tổng',
+            onTap: () => context.push(RoutePaths.ownerStaff),
           ),
 
           const SizedBox(height: 8),

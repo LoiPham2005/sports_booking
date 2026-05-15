@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../shared/mock/demo_state.dart';
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
@@ -10,6 +11,7 @@ class StaffAccountTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isManager = DemoState.instance.isManager;
     return SafeArea(
       child: ListView(
         children: [
@@ -23,34 +25,65 @@ class StaffAccountTab extends StatelessWidget {
                   width: 76,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [AppColors.accent, Color(0xFFEA580C)],
+                    gradient: LinearGradient(
+                      colors: isManager
+                          ? const [Color(0xFF8B5CF6), Color(0xFF6D28D9)]
+                          : const [AppColors.accent, Color(0xFFEA580C)],
                     ),
                   ),
                   alignment: Alignment.center,
-                  child: const Text('S',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800)),
+                  child: Text(
+                    isManager ? 'M' : 'S',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
-                const Text('Nguyễn Văn Staff',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                Text(
+                  isManager ? 'Manager Demo' : 'Nguyễn Văn Staff',
+                  style:
+                      const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.12),
+                    color: (isManager
+                            ? const Color(0xFF8B5CF6)
+                            : AppColors.accent)
+                        .withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text('STAFF',
-                      style: TextStyle(
-                          color: AppColors.accent,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isManager
+                            ? Icons.workspace_premium
+                            : Icons.shield_outlined,
+                        color: isManager
+                            ? const Color(0xFF7C3AED)
+                            : AppColors.accent,
+                        size: 12,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isManager ? 'MANAGER' : 'STAFF',
+                        style: TextStyle(
+                          color: isManager
+                              ? const Color(0xFF7C3AED)
+                              : AppColors.accent,
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5)),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -120,6 +153,25 @@ class StaffAccountTab extends StatelessWidget {
             subtitle: 'Hôm nay: 6 booking',
             onTap: () {},
           ),
+
+          if (isManager) ...[
+            const SizedBox(height: 8),
+            _Section('Quản lý (Manager)'),
+            _Tile(
+              icon: Icons.local_offer_outlined,
+              color: const Color(0xFF8B5CF6),
+              title: 'Giá tạm thời',
+              subtitle: 'Override giá theo khung giờ',
+              onTap: () => context.push(RoutePaths.staffPricing),
+            ),
+            _Tile(
+              icon: Icons.groups_outlined,
+              color: const Color(0xFF8B5CF6),
+              title: 'Đội ngũ',
+              subtitle: 'Xem nhân viên cùng venue',
+              onTap: () => context.push(RoutePaths.staffTeam),
+            ),
+          ],
 
           const SizedBox(height: 8),
           _Section('Tài khoản'),

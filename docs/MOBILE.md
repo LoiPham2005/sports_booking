@@ -1,5 +1,7 @@
 # Mobile Design — Sports Booking (Flutter)
 
+> 📍 Đọc [PROJECT.md](PROJECT.md) trước. [STATUS.md](STATUS.md) cho hiện trạng + [GOTCHAS.md](GOTCHAS.md) cho các bug đã giải quyết.
+
 UI-only Flutter app, mock data, chưa nối API. Khi backend sẵn sàng chỉ cần thay layer `mock/` bằng repository gọi REST.
 
 ## Tech stack
@@ -313,3 +315,128 @@ lib/features/
 | `BookingTile` | Tile booking dùng chung cho Owner/Staff |
 | `QrScannerPlaceholder` | Camera frame với corner brackets + scan line animation |
 | `RoleBadge` | Badge nhỏ hiển thị role hiện tại |
+
+---
+
+# Phần III — STAFF vs MANAGER + Demo state
+
+## 19. DemoState singleton
+
+File: `lib/shared/mock/demo_state.dart`
+
+```dart
+class DemoState extends ChangeNotifier {
+  static final instance = DemoState._();
+  StaffPortalRole _staffRole = StaffPortalRole.staff;
+  StaffPortalRole get staffRole => _staffRole;
+  bool get isManager => _staffRole == StaffPortalRole.manager;
+  void setStaffRole(StaffPortalRole role) { /* notify */ }
+}
+```
+
+Login set role rồi navigate `/staff`. Staff shell listen → rebuild khi role đổi.
+
+→ Khi nối API thật: thay bằng `AuthService` đọc role từ JWT, bỏ DemoState.
+
+## 20. STAFF vs MANAGER differentiation
+
+Staff shell có 3 tab (STAFF) hoặc 4 tab (MANAGER):
+- STAFF: Hôm nay / Lịch sân / Tài khoản
+- MANAGER: Hôm nay / Lịch sân / **Doanh thu** / Tài khoản
+
+**Today tab** đọc `DemoState.instance.isManager`, render thêm:
+- Card gradient tím "Doanh thu hôm nay" + delta
+- 2 nút outlined "Sửa giá" + "Đội ngũ"
+
+**Header avatar / badge** đổi màu + icon theo role:
+- STAFF: cam, icon shield
+- MANAGER: tím (`#8B5CF6`), icon workspace_premium
+
+### Sub-pages MANAGER-only
+- `/staff/pricing` — list + tạo override giá tạm thời (bottom sheet form)
+- `/staff/team` — view-only đội ngũ tại venue (mời/xoá là Owner)
+- Tab `Revenue` trong shell — total card gradient tím + 3 KPI + bar chart 16 giờ + sparkline 7 ngày + phân bố sân
+
+### Quyền cụ thể
+| Action | STAFF | MANAGER |
+|---|:-:|:-:|
+| QR check-in | ✓ | ✓ |
+| Tạo walk-in (chưa làm — placeholder) | ✓ | ✓ |
+| Xem doanh thu venue | — | ✓ |
+| Sửa giá tạm thời | — | ✓ |
+| Xem đội ngũ | — | ✓ |
+| Mời/xoá staff khác | — | Owner |
+
+## 21. Refactor customer/
+
+Đã refactor: `features/{home,venues,bookings,account,main}/` → `features/customer/{home,venues,bookings,account,main}/` để đối xứng với owner/staff. Imports `../../shared/...` → `../../../shared/...`.
+
+→ Khi tạo file customer mới: đặt trong `features/customer/<area>/<file>.dart` + import `../../../shared/...`.
+
+## 22. safePop pattern
+
+File: `lib/shared/routing/safe_pop.dart`
+
+```dart
+void safePop(BuildContext context, {String fallback = RoutePaths.main}) {
+  if (context.canPop()) context.pop();
+  else context.go(fallback);
+}
+```
+
+**Mọi nút Back trong AppBar dùng `safePop(context)`**, không `context.pop()` (vì user có thể vào page qua `context.go()` — không có gì để pop).
+
+Modal/sheet close vẫn dùng `Navigator.pop(context)` (đó là pop modal, khác scope).
+
+## 23. BookingMatrix mobile
+
+File: `lib/features/customer/venues/booking_matrix.dart`
+
+Bảng `court × hour` với:
+- **Toggle đảo trục**: nút header `Giờ↓·Sân→` ↔ `Sân↓·Giờ→`
+- 4 trạng thái ô: available (hiện giá `300k`) / selected (✓ Chọn) / held (vàng nhạt) / booked (gạch ngang)
+- Date picker prev/next + `showDatePicker`
+- Selected chips dưới matrix (tap để bỏ)
+- Voucher input + summary + CTA
+
+Mở qua DraggableScrollableSheet 95% trên venue detail.
+
+## 24. Demo login chips (5 chips)
+
+`features/auth/login_page.dart` cuối form có 5 chip:
+1. 👤 Customer → `/main`
+2. 🏟️ Owner → `/owner`
+3. 🔧 Staff → `setStaffRole(staff)` + `/staff`
+4. 👑 Manager → `setStaffRole(manager)` + `/staff`
+5. ⚡ Admin → chưa có route (web có, mobile chưa làm `/admin`)
+
+→ Khi nối API: bỏ 5 chip, đổi sang form login thật + đọc role từ JWT.
+
+## 25. Cấu trúc thư mục cập nhật
+
+```
+lib/features/
+├── splash/                         splash + onboarding (chung)
+├── auth/                           login (5 chip), register, forgot (chung)
+├── customer/                       ← MỌI flow customer gom đây
+│   ├── main/                       Shell bottom nav
+│   ├── home/                       Tab trang chủ
+│   ├── venues/                     Tab khám phá + detail + booking_matrix
+│   ├── bookings/                   Booking new/detail/result
+│   └── account/                    Profile, favorites, notifications, settings
+├── owner/                          Owner portal (4 tab + 8 sub-pages)
+│   ├── owner_shell.dart, owner_*_tab.dart, owner_*_page.dart
+│   ├── owner_venue_create_page.dart    ← MỚI
+│   ├── owner_staff_page.dart           ← MỚI
+│   └── owner_staff_invite_page.dart    ← MỚI
+└── staff/                          Staff portal (3-4 tab dynamic)
+    ├── staff_shell.dart            Listen DemoState, render tabs theo role
+    ├── staff_today_tab.dart        Hiện thêm card doanh thu nếu manager
+    ├── staff_schedule_tab.dart
+    ├── staff_revenue_tab.dart      ← MANAGER-only tab
+    ├── staff_pricing_page.dart     ← MANAGER-only page
+    ├── staff_team_page.dart        ← MANAGER-only page
+    ├── staff_account_tab.dart      Hiện section "Quản lý" nếu manager
+    ├── staff_qr_scan_page.dart
+    └── staff_booking_detail_page.dart
+```

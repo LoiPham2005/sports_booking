@@ -63,7 +63,7 @@ export default function LoginPage() {
           </span>
           <span className="text-sm font-semibold">Đăng nhập nhanh theo role</span>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           <Link href="/" className="rounded-md border bg-background p-3 text-center transition-all hover:border-primary hover:bg-primary/5">
             <div className="text-xl">👤</div>
             <div className="mt-1 text-xs font-bold text-primary">Customer</div>
@@ -72,13 +72,26 @@ export default function LoginPage() {
             <div className="text-xl">🏟️</div>
             <div className="mt-1 text-xs font-bold text-accent">Owner</div>
           </Link>
-          <Link href="/staff" className="rounded-md border bg-background p-3 text-center transition-all hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20">
+          <Link
+            href="/staff"
+            className="rounded-md border bg-background p-3 text-center transition-all hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/20"
+          >
             <div className="text-xl">🔧</div>
-            <div className="mt-1 text-xs font-bold text-blue-500">Staff</div>
+            <div className="mt-1 text-xs font-bold text-orange-500">Staff</div>
           </Link>
-          <Link href="/admin" className="rounded-md border bg-background p-3 text-center transition-all hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/20">
+          <Link
+            href="/staff?role=manager"
+            className="rounded-md border bg-background p-3 text-center transition-all hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/20"
+          >
+            <div className="text-xl">👑</div>
+            <div className="mt-1 text-xs font-bold text-violet-500">Manager</div>
+          </Link>
+          <Link
+            href="/admin"
+            className="rounded-md border bg-background p-3 text-center transition-all hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+          >
             <div className="text-xl">⚡</div>
-            <div className="mt-1 text-xs font-bold text-violet-500">Admin</div>
+            <div className="mt-1 text-xs font-bold text-purple-500">Admin</div>
           </Link>
         </div>
       </div>

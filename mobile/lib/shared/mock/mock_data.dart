@@ -78,6 +78,34 @@ class Booking {
   });
 }
 
+enum StaffRole { manager, staff }
+enum StaffStatus { active, pending, suspended }
+
+class OwnerStaff {
+  final String id;
+  final String name;
+  final String email;
+  final String phone;
+  final StaffRole role;
+  final String venueId;
+  final String venueName;
+  final StaffStatus status;
+  final DateTime joinedAt;
+  final int bookingsHandled;
+  const OwnerStaff({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.role,
+    required this.venueId,
+    required this.venueName,
+    required this.status,
+    required this.joinedAt,
+    required this.bookingsHandled,
+  });
+}
+
 class NotificationItem {
   final String id;
   final String type;
@@ -326,6 +354,70 @@ class MockData {
     'revenueMonthDelta': 8.3,
     'ratingAvg': 4.7,
   };
+
+  /// Danh sách nhân viên của owner.
+  static List<OwnerStaff> ownerStaffList = [
+    OwnerStaff(
+      id: 's1',
+      name: 'Trần Văn Trực',
+      email: 'truc@example.com',
+      phone: '+84 901 234 567',
+      role: StaffRole.manager,
+      venueId: 'v1',
+      venueName: 'Sân bóng đá Phú Mỹ Hưng',
+      status: StaffStatus.active,
+      joinedAt: DateTime.now().subtract(const Duration(days: 240)),
+      bookingsHandled: 348,
+    ),
+    OwnerStaff(
+      id: 's2',
+      name: 'Lê Thị Mai',
+      email: 'mai@example.com',
+      phone: '+84 909 876 543',
+      role: StaffRole.staff,
+      venueId: 'v1',
+      venueName: 'Sân bóng đá Phú Mỹ Hưng',
+      status: StaffStatus.active,
+      joinedAt: DateTime.now().subtract(const Duration(days: 120)),
+      bookingsHandled: 215,
+    ),
+    OwnerStaff(
+      id: 's3',
+      name: 'Nguyễn Quốc Anh',
+      email: 'anh@example.com',
+      phone: '+84 905 111 222',
+      role: StaffRole.staff,
+      venueId: 'v2',
+      venueName: 'CLB cầu lông Vinhomes Central',
+      status: StaffStatus.active,
+      joinedAt: DateTime.now().subtract(const Duration(days: 60)),
+      bookingsHandled: 88,
+    ),
+    OwnerStaff(
+      id: 's4',
+      name: 'Phạm Hoàng Long',
+      email: 'long@example.com',
+      phone: '+84 908 333 444',
+      role: StaffRole.staff,
+      venueId: 'v1',
+      venueName: 'Sân bóng đá Phú Mỹ Hưng',
+      status: StaffStatus.pending,
+      joinedAt: DateTime.now().subtract(const Duration(days: 3)),
+      bookingsHandled: 0,
+    ),
+    OwnerStaff(
+      id: 's5',
+      name: 'Đỗ Thị Hà',
+      email: 'ha@example.com',
+      phone: '+84 902 555 666',
+      role: StaffRole.staff,
+      venueId: 'v2',
+      venueName: 'CLB cầu lông Vinhomes Central',
+      status: StaffStatus.suspended,
+      joinedAt: DateTime.now().subtract(const Duration(days: 180)),
+      bookingsHandled: 124,
+    ),
+  ];
 
   /// Mock booking trong ngày dùng cho owner dashboard / staff today.
   static List<Booking> bookingsToday = [

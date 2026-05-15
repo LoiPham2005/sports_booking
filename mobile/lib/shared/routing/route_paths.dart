@@ -17,12 +17,16 @@ class RoutePaths {
   static const ownerVenueCreate = '/owner/venues/create';
   static String ownerVenueEdit(String id) => '/owner/venues/$id/edit';
   static const ownerVenueEditParam = '/owner/venues/:id/edit';
+  static const ownerStaff = '/owner/staff';
+  static const ownerStaffInvite = '/owner/staff/invite';
   static String ownerBookingDetail(String id) => '/owner/bookings/$id';
   static const ownerBookingDetailParam = '/owner/bookings/:id';
 
   // STAFF
   static const staff = '/staff';
   static const staffQrScan = '/staff/qr-scan';
+  static const staffPricing = '/staff/pricing';
+  static const staffTeam = '/staff/team';
   static String staffBookingDetail(String id) => '/staff/bookings/$id';
   static const staffBookingDetailParam = '/staff/bookings/:id';
 

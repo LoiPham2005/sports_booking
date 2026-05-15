@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../shared/mock/demo_state.dart';
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
@@ -12,6 +13,7 @@ class StaffTodayTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isManager = DemoState.instance.isManager;
     final bookings = MockData.staffBookingsToday;
     final upcoming = bookings.where((b) => b.startsAt.isAfter(DateTime.now())).toList();
     final past = bookings.where((b) => b.endsAt.isBefore(DateTime.now())).toList();
@@ -30,12 +32,19 @@ class StaffTodayTab extends StatelessWidget {
                 height: 40,
                 width: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.15),
+                  color: isManager
+                      ? const Color(0xFF8B5CF6).withValues(alpha: 0.15)
+                      : AppColors.accent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
-                child: const Icon(Icons.shield_outlined,
-                    color: AppColors.accent, size: 20),
+                child: Icon(
+                  isManager ? Icons.workspace_premium : Icons.shield_outlined,
+                  color: isManager
+                      ? const Color(0xFF7C3AED)
+                      : AppColors.accent,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -45,10 +54,37 @@ class StaffTodayTab extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          formatDateLong(DateTime.now()),
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w800),
+                        Expanded(
+                          child: Text(
+                            formatDateLong(DateTime.now()),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (isManager
+                                    ? const Color(0xFF8B5CF6)
+                                    : AppColors.accent)
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            isManager ? 'MANAGER' : 'STAFF',
+                            style: TextStyle(
+                              color: isManager
+                                  ? const Color(0xFF7C3AED)
+                                  : AppColors.accent,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 9,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -65,7 +101,111 @@ class StaffTodayTab extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+
+          // MANAGER-only: revenue glance card
+          if (isManager) ...[
+            Material(
+              color: const Color(0xFF8B5CF6),
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: () {},
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        height: 48,
+                        width: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.account_balance_wallet,
+                            color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('Doanh thu hôm nay',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 11)),
+                            Text(
+                              formatVND(2400000),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800),
+                            ),
+                            const Row(
+                              children: [
+                                Icon(Icons.trending_up,
+                                    color: Colors.white70, size: 12),
+                                SizedBox(width: 4),
+                                Text('+12% vs hôm qua',
+                                    style: TextStyle(
+                                        color: Colors.white70, fontSize: 11)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Manager quick actions (pricing + team)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.push(RoutePaths.staffPricing),
+                    icon: const Icon(Icons.local_offer_outlined, size: 16),
+                    label: const Text('Sửa giá', overflow: TextOverflow.ellipsis),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      side: BorderSide(
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
+                      foregroundColor: const Color(0xFF7C3AED),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.push(RoutePaths.staffTeam),
+                    icon: const Icon(Icons.groups_outlined, size: 16),
+                    label: const Text('Đội ngũ', overflow: TextOverflow.ellipsis),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      side: BorderSide(
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
+                      foregroundColor: const Color(0xFF7C3AED),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
 
           // BIG QR SCAN BUTTON
           Material(

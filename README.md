@@ -1,5 +1,7 @@
 # Sports Booking App
 
+> 📍 **Lần đầu tiếp cận dự án?** Đọc [`docs/PROJECT.md`](docs/PROJECT.md) — orientation đầy đủ + commands + file map.
+
 Ứng dụng đặt sân thể thao (bóng đá, cầu lông, tennis, pickleball, bóng rổ...). Hỗ trợ người chơi tìm và đặt sân, chủ sân quản lý lịch và doanh thu, admin vận hành nền tảng.
 
 ## Stack
@@ -18,10 +20,13 @@ sports_booking/
 ├── frontend/       Next.js 14 web app
 ├── mobile/         Flutter mobile app
 ├── docs/
+│   ├── PROJECT.md      🎯 ORIENTATION cho dev mới
+│   ├── STATUS.md       Đã làm / chưa làm
+│   ├── GOTCHAS.md      Bug đã gặp + cách fix (đọc trước!)
 │   ├── FEATURES.md     Chức năng backend
 │   ├── DATABASE.md     Thiết kế DB chi tiết
-│   ├── FRONTEND.md     Sitemap & design system web
-│   └── MOBILE.md       Sitemap & design system mobile
+│   ├── FRONTEND.md     Sitemap & design system web (có RBAC matrix)
+│   └── MOBILE.md       Sitemap & design system mobile (có manager/staff)
 └── README.md
 ```
 

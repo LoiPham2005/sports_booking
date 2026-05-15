@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../shared/mock/demo_state.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
 
@@ -178,12 +179,31 @@ class _LoginPageState extends State<LoginPage> {
                           color: AppColors.accent,
                           onTap: () => context.go(RoutePaths.owner),
                         ),
-                        const SizedBox(width: 6),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
                         _DemoChip(
                           emoji: '🔧',
                           label: 'Staff',
                           color: AppColors.info,
-                          onTap: () => context.go(RoutePaths.staff),
+                          onTap: () {
+                            DemoState.instance
+                                .setStaffRole(StaffPortalRole.staff);
+                            context.go(RoutePaths.staff);
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _DemoChip(
+                          emoji: '👑',
+                          label: 'Manager',
+                          color: const Color(0xFF8B5CF6),
+                          onTap: () {
+                            DemoState.instance
+                                .setStaffRole(StaffPortalRole.manager);
+                            context.go(RoutePaths.staff);
+                          },
                         ),
                       ],
                     ),
