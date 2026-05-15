@@ -1,0 +1,716 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [btree_gist, pg_trgm]
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+enum Role {
+  CUSTOMER
+  OWNER
+  STAFF
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum VenueStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+enum Surface {
+  NATURAL_GRASS
+  ARTIFICIAL_GRASS
+  WOOD
+  EPOXY
+  CLAY
+  RUBBER
+  CONCRETE
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED_BY_USER
+  CANCELLED_BY_OWNER
+  CANCELLED_TIMEOUT
+  NO_SHOW
+  REFUNDED
+}
+
+enum BookingSource {
+  ONLINE
+  WALK_IN
+}
+
+enum PaymentProvider {
+  VNPAY
+  MOMO
+  ZALOPAY
+  STRIPE
+  BANK_TRANSFER
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  EXPIRED
+  REFUND_PENDING
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum VoucherType {
+  PERCENT
+  FIXED
+}
+
+enum VoucherScope {
+  GLOBAL
+  VENUE
+  SPORT
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+enum NotificationChannel {
+  PUSH
+  EMAIL
+  SMS
+  IN_APP
+}
+
+enum ReviewStatus {
+  VISIBLE
+  HIDDEN
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+}
+
+enum OwnerEarningStatus {
+  PENDING
+  PAID
+}
+
+enum VenueMemberRole {
+  MANAGER
+  STAFF
+}
+
+enum MediaOwnerType {
+  USER
+  VENUE
+  COURT
+  REVIEW
+}
+
+// ============================================================
+// USER & AUTH
+// ============================================================
+model User {
+  id            String      @id @default(cuid())
+  email         String?     @unique
+  phone         String?     @unique
+  passwordHash  String?
+  fullName      String
+  avatarUrl     String?
+  dob           DateTime?   @db.Date
+  gender        Gender?
+  locale        String      @default("vi")
+  role          Role        @default(CUSTOMER)
+  emailVerified Boolean     @default(false)
+  phoneVerified Boolean     @default(false)
+  status        UserStatus  @default(ACTIVE)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  ownedVenues       Venue[]               @relation("VenueOwner")
+  memberships       VenueMember[]
+  bookings          Booking[]
+  payments          Payment[]
+  reviews           Review[]
+  favorites         Favorite[]
+  refreshTokens     RefreshToken[]
+  devices           Device[]
+  notifications     Notification[]
+  notificationPrefs NotificationPreference[]
+  bankAccounts      BankAccount[]
+  ownerEarnings     OwnerEarning[]
+  payouts           Payout[]
+  redemptions       VoucherRedemption[]
+  auditLogs         AuditLog[]            @relation("AuditActor")
+
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  deviceId  String?
+  ip        String?
+  userAgent String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+}
+
+model Device {
+  id         String         @id @default(cuid())
+  userId     String
+  platform   DevicePlatform
+  fcmToken   String?
+  lastSeenAt DateTime       @default(now())
+  createdAt  DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@unique([userId, fcmToken])
+}
+
+model OtpCode {
+  id         String   @id @default(cuid())
+  target     String   // email or phone
+  codeHash   String
+  purpose    String   // VERIFY_PHONE, RESET_PASSWORD, ...
+  attempts   Int      @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([target, purpose])
+}
+
+// ============================================================
+// SPORT & AMENITY
+// ============================================================
+model Sport {
+  id                  String  @id @default(cuid())
+  slug                String  @unique
+  nameVi              String
+  nameEn              String
+  icon                String?
+  defaultSlotMinutes  Int     @default(60)
+  isActive            Boolean @default(true)
+
+  courts Court[]
+}
+
+model Amenity {
+  id     String          @id @default(cuid())
+  slug   String          @unique
+  nameVi String
+  nameEn String
+  icon   String?
+
+  venues VenueAmenity[]
+}
+
+// ============================================================
+// VENUE & COURT
+// ============================================================
+model Venue {
+  id               String       @id @default(cuid())
+  ownerId          String
+  name             String
+  slug             String       @unique
+  description      String?      @db.Text
+  addressLine      String
+  ward             String?
+  district         String?
+  city             String
+  country          String       @default("VN")
+  lat              Decimal?     @db.Decimal(10, 7)
+  lng              Decimal?     @db.Decimal(10, 7)
+  phone            String?
+  status           VenueStatus  @default(DRAFT)
+  ratingAvg        Decimal      @default(0) @db.Decimal(2, 1)
+  ratingCount      Int          @default(0)
+  cancelPolicyJson Json?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  deletedAt        DateTime?
+
+  owner     User             @relation("VenueOwner", fields: [ownerId], references: [id])
+  courts    Court[]
+  images    VenueImage[]
+  amenities VenueAmenity[]
+  hours     VenueHour[]
+  members   VenueMember[]
+  bookings  Booking[]
+  reviews   Review[]
+  favorites Favorite[]
+
+  @@index([ownerId])
+  @@index([city, status])
+}
+
+model VenueImage {
+  id        String  @id @default(cuid())
+  venueId   String
+  url       String
+  sort      Int     @default(0)
+  isPrimary Boolean @default(false)
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId])
+}
+
+model VenueAmenity {
+  venueId   String
+  amenityId String
+
+  venue   Venue   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  amenity Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, amenityId])
+}
+
+model VenueHour {
+  id        String   @id @default(cuid())
+  venueId   String
+  dayOfWeek Int      // 0 = Sunday
+  openTime  String   // "06:00"
+  closeTime String   // "22:00"
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, dayOfWeek])
+}
+
+model VenueMember {
+  id      String          @id @default(cuid())
+  venueId String
+  userId  String
+  role    VenueMemberRole @default(STAFF)
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, userId])
+}
+
+model Court {
+  id                  String   @id @default(cuid())
+  venueId             String
+  sportId             String
+  name                String
+  surface             Surface
+  indoor              Boolean  @default(false)
+  capacity            Int      @default(10)
+  slotDurationMinutes Int      @default(60)
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  deletedAt           DateTime?
+
+  venue           Venue            @relation(fields: [venueId], references: [id])
+  sport           Sport            @relation(fields: [sportId], references: [id])
+  priceRules      PriceRule[]
+  priceOverrides  PriceOverride[]
+  closures        CourtClosure[]
+  bookings        Booking[]
+
+  @@index([venueId])
+  @@index([sportId])
+}
+
+model CourtClosure {
+  id       String   @id @default(cuid())
+  courtId  String
+  startsAt DateTime
+  endsAt   DateTime
+  reason   String?
+
+  court Court @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@index([courtId, startsAt])
+}
+
+// ============================================================
+// PRICING
+// ============================================================
+model PriceRule {
+  id            String  @id @default(cuid())
+  courtId       String
+  dayOfWeek     Int
+  startTime     String  // "06:00"
+  endTime       String  // "10:00"
+  pricePerSlot  Decimal @db.Decimal(12, 2)
+
+  court Court @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@index([courtId, dayOfWeek])
+}
+
+model PriceOverride {
+  id        String   @id @default(cuid())
+  courtId   String
+  date      DateTime @db.Date
+  startTime String
+  endTime   String
+  price     Decimal  @db.Decimal(12, 2)
+  reason    String?
+
+  court Court @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@index([courtId, date])
+}
+
+// ============================================================
+// BOOKING
+// ============================================================
+model Booking {
+  id                String         @id @default(cuid())
+  code              String         @unique
+  userId            String
+  courtId           String
+  venueId           String
+  startsAt          DateTime
+  endsAt            DateTime
+  status            BookingStatus  @default(PENDING_PAYMENT)
+  source            BookingSource  @default(ONLINE)
+  subtotal          Decimal        @db.Decimal(12, 2)
+  discount          Decimal        @default(0) @db.Decimal(12, 2)
+  total             Decimal        @db.Decimal(12, 2)
+  voucherId         String?
+  notes             String?
+  checkInToken      String?        @unique
+  checkedInAt       DateTime?
+  cancelledAt       DateTime?
+  cancelReason      String?
+  refundAmount      Decimal?       @db.Decimal(12, 2)
+  recurringGroupId  String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  user        User                 @relation(fields: [userId], references: [id])
+  court       Court                @relation(fields: [courtId], references: [id])
+  venue       Venue                @relation(fields: [venueId], references: [id])
+  payments    Payment[]
+  review      Review?
+  redemption  VoucherRedemption?
+  earnings    OwnerEarning[]
+
+  @@index([userId, createdAt])
+  @@index([courtId, startsAt])
+  @@index([venueId, startsAt])
+  @@index([status])
+  @@index([recurringGroupId])
+}
+
+// ============================================================
+// PAYMENT
+// ============================================================
+model Payment {
+  id              String          @id @default(cuid())
+  bookingId       String?
+  userId          String
+  provider        PaymentProvider
+  amount          Decimal         @db.Decimal(12, 2)
+  currency        String          @default("VND")
+  status          PaymentStatus   @default(PENDING)
+  providerRef     String?
+  providerOrderId String          @unique
+  redirectUrl     String?         @db.Text
+  qrData          String?         @db.Text
+  paidAt          DateTime?
+  failedReason    String?
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  booking  Booking?         @relation(fields: [bookingId], references: [id])
+  user     User             @relation(fields: [userId], references: [id])
+  events   PaymentEvent[]
+  refunds  Refund[]
+  earnings OwnerEarning[]
+
+  @@index([bookingId])
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model PaymentEvent {
+  id              String          @id @default(cuid())
+  paymentId       String?
+  provider        PaymentProvider
+  eventType       String
+  externalEventId String
+  rawPayload      Json
+  signatureValid  Boolean
+  processedAt     DateTime?
+  createdAt       DateTime        @default(now())
+
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@unique([provider, externalEventId])
+  @@index([paymentId])
+}
+
+model Refund {
+  id                String       @id @default(cuid())
+  paymentId         String
+  amount            Decimal      @db.Decimal(12, 2)
+  reason            String?
+  status            RefundStatus @default(PENDING)
+  providerRefundRef String?
+  requestedById     String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+}
+
+// ============================================================
+// VOUCHER
+// ============================================================
+model Voucher {
+  id            String       @id @default(cuid())
+  code          String       @unique
+  type          VoucherType
+  value         Decimal      @db.Decimal(12, 2)
+  maxDiscount   Decimal?     @db.Decimal(12, 2)
+  minOrder      Decimal?     @db.Decimal(12, 2)
+  validFrom     DateTime
+  validTo       DateTime
+  usageLimit    Int?
+  perUserLimit  Int?
+  scope         VoucherScope @default(GLOBAL)
+  scopeRefId    String?
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  redemptions VoucherRedemption[]
+}
+
+model VoucherRedemption {
+  id        String   @id @default(cuid())
+  voucherId String
+  userId    String
+  bookingId String   @unique
+  amount    Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+
+  voucher Voucher @relation(fields: [voucherId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([voucherId])
+  @@unique([voucherId, userId, bookingId])
+}
+
+// ============================================================
+// REVIEW
+// ============================================================
+model Review {
+  id             String       @id @default(cuid())
+  userId         String
+  venueId        String
+  bookingId      String       @unique
+  rating         Int
+  content        String?      @db.Text
+  ownerReply     String?      @db.Text
+  ownerRepliedAt DateTime?
+  status         ReviewStatus @default(VISIBLE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  venue   Venue   @relation(fields: [venueId], references: [id])
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([venueId, status])
+}
+
+// ============================================================
+// FAVORITE
+// ============================================================
+model Favorite {
+  userId    String
+  venueId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([userId, venueId])
+}
+
+// ============================================================
+// NOTIFICATION
+// ============================================================
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String?   @db.Text
+  dataJson  Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+  id      String              @id @default(cuid())
+  userId  String
+  type    String
+  channel NotificationChannel
+  enabled Boolean             @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, channel])
+}
+
+// ============================================================
+// MEDIA
+// ============================================================
+model MediaAsset {
+  id        String         @id @default(cuid())
+  ownerType MediaOwnerType
+  ownerId   String
+  key       String         @unique
+  url       String
+  mimeType  String
+  sizeBytes Int
+  width     Int?
+  height    Int?
+  createdAt DateTime       @default(now())
+
+  @@index([ownerType, ownerId])
+}
+
+// ============================================================
+// PAYOUT
+// ============================================================
+model BankAccount {
+  id            String   @id @default(cuid())
+  userId        String
+  bankCode      String
+  accountNumber String
+  accountHolder String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payouts Payout[]
+
+  @@index([userId])
+}
+
+model OwnerEarning {
+  id         String             @id @default(cuid())
+  ownerId    String
+  bookingId  String
+  paymentId  String
+  gross      Decimal            @db.Decimal(12, 2)
+  commission Decimal            @db.Decimal(12, 2)
+  netAmount  Decimal            @db.Decimal(12, 2)
+  status     OwnerEarningStatus @default(PENDING)
+  payoutId   String?
+  createdAt  DateTime           @default(now())
+
+  owner   User     @relation(fields: [ownerId], references: [id])
+  booking Booking  @relation(fields: [bookingId], references: [id])
+  payment Payment  @relation(fields: [paymentId], references: [id])
+  payout  Payout?  @relation(fields: [payoutId], references: [id])
+
+  @@index([ownerId, status])
+  @@index([payoutId])
+}
+
+model Payout {
+  id            String       @id @default(cuid())
+  ownerId       String
+  periodFrom    DateTime
+  periodTo      DateTime
+  amount        Decimal      @db.Decimal(12, 2)
+  status        PayoutStatus @default(PENDING)
+  bankAccountId String
+  reference     String?
+  createdAt     DateTime     @default(now())
+  paidAt        DateTime?
+
+  owner       User           @relation(fields: [ownerId], references: [id])
+  bankAccount BankAccount    @relation(fields: [bankAccountId], references: [id])
+  earnings    OwnerEarning[]
+
+  @@index([ownerId])
+}
+
+// ============================================================
+// AUDIT
+// ============================================================
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorId      String?
+  actorRole    String?
+  action       String
+  resourceType String
+  resourceId   String?
+  beforeJson   Json?
+  afterJson    Json?
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([resourceType, resourceId])
+  @@index([actorId, createdAt])
+}
