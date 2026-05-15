@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, ChevronLeft, ChevronRight, Tag, Wallet, ChevronRight as ArrowRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Tag, Wallet, ChevronRight as ArrowRight, ArrowLeftRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { COURTS, TIME_SLOTS, mockCellStatus, type Venue, type CellStatus } from '@/lib/mock-data';
@@ -16,10 +16,13 @@ interface SlotKey {
 
 const slotKey = (k: SlotKey) => `${k.courtId}__${k.hour}`;
 
+type Axis = 'time-rows' | 'court-rows';
+
 export function BookingMatrix({ venue }: { venue: Venue }) {
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selected, setSelected] = useState<Record<string, SlotKey>>({});
   const [voucher, setVoucher] = useState('');
+  const [axis, setAxis] = useState<Axis>('time-rows');
 
   const selectedList = Object.values(selected);
 
@@ -77,8 +80,24 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
           </p>
         </div>
 
-        {/* Date picker */}
+        {/* Date picker + axis toggle */}
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAxis(axis === 'time-rows' ? 'court-rows' : 'time-rows')}
+            title={
+              axis === 'time-rows'
+                ? 'Đảo trục: chuyển sân thành hàng, giờ thành cột'
+                : 'Đảo trục: chuyển giờ thành hàng, sân thành cột'
+            }
+          >
+            <ArrowLeftRight className="h-4 w-4" />
+            <span className="hidden sm:inline">
+              {axis === 'time-rows' ? 'Giờ ↓ · Sân →' : 'Sân ↓ · Giờ →'}
+            </span>
+          </Button>
+
           <Button variant="outline" size="icon" onClick={() => shiftDate(-1)} aria-label="Ngày trước">
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -107,74 +126,93 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
 
       {/* Matrix */}
       <div className="overflow-x-auto p-4">
-        <table className="min-w-full border-separate" style={{ borderSpacing: 4 }}>
-          {/* Court header */}
-          <thead>
-            <tr>
-              <th className="sticky left-0 z-10 w-20 bg-card pr-2 text-left">
-                <span className="text-xs uppercase tracking-wide text-muted-foreground">Giờ</span>
-              </th>
-              {COURTS.map((c) => (
-                <th key={c.id} className="min-w-[110px] px-1">
-                  <div className="rounded-md bg-muted/50 px-2 py-2 text-center">
-                    <p className="text-sm font-bold">{c.name}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {formatVND(c.pricePerHour)}/h
-                    </p>
-                  </div>
+        {axis === 'time-rows' ? (
+          // Layout: rows = hours, cols = courts
+          <table className="min-w-full border-separate" style={{ borderSpacing: 4 }}>
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 w-20 bg-card pr-2 text-left">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Giờ</span>
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {TIME_SLOTS.map((hour) => (
-              <tr key={hour}>
-                <td className="sticky left-0 z-10 bg-card pr-2 align-middle">
-                  <span className="font-mono text-xs font-semibold text-muted-foreground">
-                    {hour}
-                  </span>
-                </td>
-                {COURTS.map((c) => {
-                  const status = mockCellStatus(c.id, hour);
-                  const isSelected = !!selected[slotKey({ courtId: c.id, hour })];
-                  const disabled = status === 'booked';
-
-                  let cellClass = '';
-                  let cellText = '';
-                  if (isSelected) {
-                    cellClass = 'bg-primary text-primary-foreground border-primary shadow-sm';
-                    cellText = '✓ Chọn';
-                  } else if (status === 'booked') {
-                    cellClass = 'bg-muted text-muted-foreground cursor-not-allowed border-transparent line-through';
-                    cellText = 'Đã đặt';
-                  } else if (status === 'held') {
-                    cellClass = 'bg-warning/15 text-amber-700 border-warning/40 dark:text-amber-300';
-                    cellText = 'Đang giữ';
-                  } else {
-                    cellClass = 'bg-background hover:border-primary hover:bg-primary/5 border';
-                    cellText = `${formatVND(c.pricePerHour)}`.replace(/\.\d{2}$/, '');
-                  }
-
-                  return (
-                    <td key={c.id + hour} className="px-1 py-1">
-                      <button
-                        type="button"
-                        onClick={() => toggle(c.id, hour, status)}
-                        disabled={disabled}
-                        className={cn(
-                          'w-full rounded-md border px-2 py-2.5 text-xs font-semibold transition-all',
-                          cellClass,
-                        )}
-                      >
-                        {cellText}
-                      </button>
-                    </td>
-                  );
-                })}
+                {COURTS.map((c) => (
+                  <th key={c.id} className="min-w-[110px] px-1">
+                    <div className="rounded-md bg-muted/50 px-2 py-2 text-center">
+                      <p className="text-sm font-bold">{c.name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatVND(c.pricePerHour)}/h
+                      </p>
+                    </div>
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {TIME_SLOTS.map((hour) => (
+                <tr key={hour}>
+                  <td className="sticky left-0 z-10 bg-card pr-2 align-middle">
+                    <span className="font-mono text-xs font-semibold text-muted-foreground">
+                      {hour}
+                    </span>
+                  </td>
+                  {COURTS.map((c) => (
+                    <td key={c.id + hour} className="px-1 py-1">
+                      <Cell
+                        courtId={c.id}
+                        hour={hour}
+                        pricePerHour={c.pricePerHour}
+                        selected={!!selected[slotKey({ courtId: c.id, hour })]}
+                        onToggle={toggle}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          // Layout: rows = courts, cols = hours
+          <table className="min-w-full border-separate" style={{ borderSpacing: 4 }}>
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 w-32 bg-card pr-2 text-left">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Sân</span>
+                </th>
+                {TIME_SLOTS.map((h) => (
+                  <th key={h} className="min-w-[110px] px-1">
+                    <div className="rounded-md bg-muted/50 px-2 py-2 text-center">
+                      <p className="font-mono text-xs font-bold">{h}</p>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {COURTS.map((c) => (
+                <tr key={c.id}>
+                  <td className="sticky left-0 z-10 w-32 bg-card pr-2 align-middle">
+                    <div>
+                      <p className="text-sm font-bold leading-tight">{c.name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatVND(c.pricePerHour)}/h
+                      </p>
+                    </div>
+                  </td>
+                  {TIME_SLOTS.map((hour) => (
+                    <td key={c.id + hour} className="px-1 py-1">
+                      <Cell
+                        courtId={c.id}
+                        hour={hour}
+                        pricePerHour={c.pricePerHour}
+                        selected={!!selected[slotKey({ courtId: c.id, hour })]}
+                        onToggle={toggle}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Selected slots chips */}
@@ -275,6 +313,53 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
         </p>
       </div>
     </div>
+  );
+}
+
+function Cell({
+  courtId,
+  hour,
+  pricePerHour,
+  selected,
+  onToggle,
+}: {
+  courtId: string;
+  hour: string;
+  pricePerHour: number;
+  selected: boolean;
+  onToggle: (courtId: string, hour: string, status: CellStatus) => void;
+}) {
+  const status = mockCellStatus(courtId, hour);
+  const disabled = status === 'booked';
+
+  let cellClass = '';
+  let cellText: string;
+  if (selected) {
+    cellClass = 'bg-primary text-primary-foreground border-primary shadow-sm';
+    cellText = '✓ Chọn';
+  } else if (status === 'booked') {
+    cellClass = 'bg-muted text-muted-foreground cursor-not-allowed border-transparent line-through';
+    cellText = 'Đã đặt';
+  } else if (status === 'held') {
+    cellClass = 'bg-warning/15 text-amber-700 border-warning/40 dark:text-amber-300';
+    cellText = 'Đang giữ';
+  } else {
+    cellClass = 'bg-background hover:border-primary hover:bg-primary/5 border';
+    cellText = formatVND(pricePerHour);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(courtId, hour, status)}
+      disabled={disabled}
+      className={cn(
+        'w-full rounded-md border px-2 py-2.5 text-xs font-semibold transition-all',
+        cellClass,
+      )}
+    >
+      {cellText}
+    </button>
   );
 }
 
