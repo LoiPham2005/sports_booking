@@ -26,7 +26,8 @@ sports_booking/
 │   ├── FEATURES.md     Chức năng backend
 │   ├── DATABASE.md     Thiết kế DB chi tiết
 │   ├── FRONTEND.md     Sitemap & design system web (có RBAC matrix)
-│   └── MOBILE.md       Sitemap & design system mobile (có manager/staff)
+│   ├── MOBILE.md       Sitemap & design system mobile (có manager/staff)
+│   └── API_INTEGRATION.md  🔌 Mapping UI ↔ DB + checklist khi nối API
 └── README.md
 ```
 

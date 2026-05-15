@@ -114,20 +114,25 @@
 
 ❌ Chưa làm gì cả. Cả frontend lẫn mobile đều chạy 100% mock data.
 
+> 📋 **Trước khi bắt đầu nối**: Đọc [API_INTEGRATION.md](API_INTEGRATION.md) — mapping field-by-field UI ↔ DB + checklist đầy đủ. Có drift được liệt kê (BookingStatus 5↔9, Court không có `pricePerHour` trong DB, VenueMember thiếu `inviteStatus/joinedAt`, single `image` vs `VenueImage[]`...).
+
 ### Khi sẵn sàng nối API
 
 **Web**:
 1. Tạo `lib/api/` với fetcher + types từ Prisma
-2. Replace `import { VENUES } from '@/lib/mock-data'` → `await fetch('/venues')`
-3. Thêm `middleware.ts` đọc JWT cookie, redirect role
-4. Bỏ 5 demo chip ở login
+2. Viết adapters (xem [API_INTEGRATION.md § 13](API_INTEGRATION.md#13-adapter-layer-khuyến-nghị))
+3. Replace `import { VENUES } from '@/lib/mock-data'` → `await fetch('/venues')`
+4. Thêm `middleware.ts` đọc JWT cookie, redirect role
+5. Bỏ 5 demo chip ở login
 
 **Mobile**:
 1. `flutter pub add dio retrofit json_serializable freezed flutter_secure_storage`
-2. Tạo `lib/data/` với services + repositories
+2. Tạo `lib/data/` với services + repositories + adapters
 3. Thay `MockData.x` → `FutureBuilder<List<Venue>>(future: venuesRepo.list())`
 4. Thêm Riverpod hoặc Bloc nếu cần state phức tạp
 5. Bỏ `DemoState`, đọc role từ JWT
+
+**Schema cần bổ sung trước**: xem [API_INTEGRATION.md § 14](API_INTEGRATION.md#14-checklist-khi-nối-api) — `VenueMember.inviteStatus`, `Booking.handledByUserId`, endpoint denormalize cho Venue/Sport...
 
 ## Roadmap đề xuất
 

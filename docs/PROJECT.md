@@ -71,7 +71,8 @@ sports_booking/
 │   ├── FEATURES.md              Backend features (22 sections)
 │   ├── DATABASE.md              Prisma schema + index + constraints
 │   ├── FRONTEND.md              Web sitemap + RBAC matrix + components
-│   └── MOBILE.md                Mobile sitemap + customer/owner/staff portals
+│   ├── MOBILE.md                Mobile sitemap + customer/owner/staff portals
+│   └── API_INTEGRATION.md       🔌 Mapping UI mock ↔ DB schema (đọc trước khi nối API)
 │
 ├── backend/                     NestJS API
 │   ├── prisma/schema.prisma     27 models (User, Venue, Court, Booking, Payment, ...)
@@ -185,3 +186,4 @@ sports_booking/
 - [DATABASE.md](DATABASE.md) — schema Prisma chi tiết
 - [FRONTEND.md](FRONTEND.md) — sitemap web + RBAC + components
 - [MOBILE.md](MOBILE.md) — sitemap mobile + customer/owner/staff
+- [API_INTEGRATION.md](API_INTEGRATION.md) — **đọc trước khi nối API**: field-by-field UI ↔ DB + checklist

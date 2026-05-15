@@ -171,13 +171,13 @@ class OwnerAccountTab extends StatelessWidget {
             icon: Icons.settings_outlined,
             color: AppColors.textSecondary,
             title: 'Cài đặt',
-            onTap: () {},
+            onTap: () => context.push(RoutePaths.ownerSettings),
           ),
           _Tile(
             icon: Icons.help_outline,
             color: AppColors.textSecondary,
             title: 'Trợ giúp',
-            onTap: () {},
+            onTap: () => context.push(RoutePaths.ownerHelp),
           ),
 
           const SizedBox(height: 16),

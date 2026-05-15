@@ -150,8 +150,8 @@ class StaffAccountTab extends StatelessWidget {
             icon: Icons.event_note_outlined,
             color: AppColors.info,
             title: 'Báo cáo ca trực',
-            subtitle: 'Hôm nay: 6 booking',
-            onTap: () {},
+            subtitle: 'Hôm nay: ${MockData.staffBookingsToday.length} booking',
+            onTap: () => context.push(RoutePaths.staffShiftReport),
           ),
 
           if (isManager) ...[
@@ -179,19 +179,19 @@ class StaffAccountTab extends StatelessWidget {
             icon: Icons.person_outline,
             color: AppColors.textSecondary,
             title: 'Hồ sơ',
-            onTap: () {},
+            onTap: () => context.push(RoutePaths.staffProfile),
           ),
           _Tile(
             icon: Icons.lock_outline,
             color: AppColors.textSecondary,
             title: 'Đổi mật khẩu',
-            onTap: () {},
+            onTap: () => context.push(RoutePaths.staffChangePassword),
           ),
           _Tile(
             icon: Icons.help_outline,
             color: AppColors.textSecondary,
             title: 'Trợ giúp',
-            onTap: () {},
+            onTap: () => context.push(RoutePaths.staffHelp),
           ),
 
           const SizedBox(height: 16),

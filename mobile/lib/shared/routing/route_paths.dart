@@ -19,6 +19,8 @@ class RoutePaths {
   static const ownerVenueEditParam = '/owner/venues/:id/edit';
   static const ownerStaff = '/owner/staff';
   static const ownerStaffInvite = '/owner/staff/invite';
+  static const ownerSettings = '/owner/settings';
+  static const ownerHelp = '/owner/help';
   static String ownerBookingDetail(String id) => '/owner/bookings/$id';
   static const ownerBookingDetailParam = '/owner/bookings/:id';
 
@@ -27,6 +29,10 @@ class RoutePaths {
   static const staffQrScan = '/staff/qr-scan';
   static const staffPricing = '/staff/pricing';
   static const staffTeam = '/staff/team';
+  static const staffShiftReport = '/staff/shift-report';
+  static const staffProfile = '/staff/profile';
+  static const staffChangePassword = '/staff/change-password';
+  static const staffHelp = '/staff/help';
   static String staffBookingDetail(String id) => '/staff/bookings/$id';
   static const staffBookingDetailParam = '/staff/bookings/:id';
 
