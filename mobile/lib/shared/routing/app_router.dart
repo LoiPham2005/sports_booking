@@ -36,6 +36,7 @@ import '../../features/staff/staff_shell.dart';
 import '../../features/staff/staff_shift_report_page.dart';
 import '../../features/staff/staff_team_page.dart';
 import '../../features/customer/venues/venue_detail_page.dart';
+import '../../features/customer/venues/venues_map_page.dart';
 import '../../features/customer/venues/venues_page.dart';
 import 'route_paths.dart';
 
@@ -56,6 +57,9 @@ final appRouter = GoRouter(
     GoRoute(path: RoutePaths.main, builder: (_, __) => const MainShell()),
 
     GoRoute(path: RoutePaths.venues, builder: (_, __) => const VenuesPage()),
+    GoRoute(
+        path: RoutePaths.venuesMap,
+        builder: (_, __) => const VenuesMapPage()),
     GoRoute(
       path: RoutePaths.venueDetailParam,
       builder: (_, state) => VenueDetailPage(id: state.pathParameters['id']!),

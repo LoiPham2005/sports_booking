@@ -325,6 +325,21 @@ class MockData {
     ),
   ];
 
+  /// Tọa độ GPS demo cho từng venue (TP.HCM).
+  /// Dùng cho `venues_map_page.dart`. Khi nối API, đọc từ `venue.lat/lng`.
+  static const venueLocations = <String, (double, double)>{
+    'v1': (10.7251, 106.7194), // Phú Mỹ Hưng, Q7
+    'v2': (10.7969, 106.7220), // Vinhomes Central, Bình Thạnh
+    'v3': (10.7755, 106.6685), // Lan Anh, Q10
+    'v4': (10.7783, 106.7029), // Saigon SC, Q1 (Thi Sách)
+    'v5': (10.7745, 106.6925), // Tao Đàn, Q1
+    'v6': (10.8506, 106.7717), // Thủ Đức (Võ Văn Ngân)
+  };
+
+  /// Trung tâm bản đồ mặc định: Quận 1, TP.HCM.
+  static const mapCenter = (10.7769, 106.7009);
+  static const mapInitialZoom = 12.0;
+
   static const timeSlots = [
     '06:00', '07:00', '08:00', '09:00',
     '10:00', '11:00', '12:00', '13:00',

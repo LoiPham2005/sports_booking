@@ -37,44 +37,60 @@ class _MainShellState extends State<MainShell> {
         shape: const CircleBorder(),
         child: const Icon(Icons.search, size: 26),
       ),
-      bottomNavigationBar: BottomAppBar(
-        height: 70,
-        padding: EdgeInsets.zero,
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _NavItem(
-              icon: Icons.home_outlined,
-              activeIcon: Icons.home_rounded,
-              label: 'Trang chủ',
-              active: _index == 0,
-              onTap: () => setState(() => _index = 0),
-            ),
-            _NavItem(
-              icon: Icons.explore_outlined,
-              activeIcon: Icons.explore_rounded,
-              label: 'Khám phá',
-              active: _index == 1,
-              onTap: () => setState(() => _index = 1),
-            ),
-            const SizedBox(width: 40),
-            _NavItem(
-              icon: Icons.event_note_outlined,
-              activeIcon: Icons.event_note_rounded,
-              label: 'Booking',
-              active: _index == 2,
-              onTap: () => setState(() => _index = 2),
-            ),
-            _NavItem(
-              icon: Icons.person_outline_rounded,
-              activeIcon: Icons.person_rounded,
-              label: 'Tài khoản',
-              active: _index == 3,
-              onTap: () => setState(() => _index = 3),
+      // NOTE: dùng Container thay vì BottomAppBar(shape: CircularNotchedRectangle)
+      // vì BottomAppBar có bug khi hit-test gọi Scaffold.geometryOf().value
+      // ngoài paint phase → throw. Xem GOTCHAS.md §18.
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          border: const Border(top: BorderSide(color: AppColors.border)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0A000000),
+              blurRadius: 8,
+              offset: Offset(0, -2),
             ),
           ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 64,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _NavItem(
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home_rounded,
+                  label: 'Trang chủ',
+                  active: _index == 0,
+                  onTap: () => setState(() => _index = 0),
+                ),
+                _NavItem(
+                  icon: Icons.explore_outlined,
+                  activeIcon: Icons.explore_rounded,
+                  label: 'Khám phá',
+                  active: _index == 1,
+                  onTap: () => setState(() => _index = 1),
+                ),
+                const SizedBox(width: 56),
+                _NavItem(
+                  icon: Icons.event_note_outlined,
+                  activeIcon: Icons.event_note_rounded,
+                  label: 'Booking',
+                  active: _index == 2,
+                  onTap: () => setState(() => _index = 2),
+                ),
+                _NavItem(
+                  icon: Icons.person_outline_rounded,
+                  activeIcon: Icons.person_rounded,
+                  label: 'Tài khoản',
+                  active: _index == 3,
+                  onTap: () => setState(() => _index = 3),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -107,7 +123,9 @@ class _NavItem extends StatelessWidget {
           children: [
             Icon(active ? activeIcon : icon, color: color, size: 24),
             const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w600)),
+            Text(label,
+                style: TextStyle(
+                    color: color, fontSize: 10.5, fontWeight: FontWeight.w600)),
           ],
         ),
       ),

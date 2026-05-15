@@ -73,7 +73,7 @@
 
 ### ⏳ Chưa làm
 - Notifications page chi tiết (đã có /account/notifications nhưng thiếu group theo ngày)
-- Map view trên `/venues` (hiện là placeholder)
+- Map view trên web `/venues` (mobile đã có OSM, web chưa)
 - Real-time booking calendar update (cần WebSocket)
 - Dark mode toggle UI (theme đã chuẩn bị trong globals.css)
 - i18n EN
@@ -90,6 +90,7 @@
 - Main shell BottomNavigationBar 4 tab
 - Home tab (greeting, search, promo banner, sport chips, venue list)
 - Venues search + Venue detail với **BookingMatrix** (axis toggle Giờ↓·Sân→ ↔ Sân↓·Giờ→)
+- **Venues map view** (`/venues/map`) — OpenStreetMap full-screen: custom pin marker theo môn, search + filter + draggable bottom sheet + selected card, my-location, "tìm trong khu vực" pill khi pan
 - Booking flow (2-step) + Result + Detail (QR code)
 - Account tab + Favorites + Notifications + Profile + Settings
 

@@ -120,8 +120,31 @@ PageIndicator + nút "Bỏ qua" / "Tiếp tục".
 - AppBar: ô search dài, filter button bên phải.
 - Sliver list venue card đầy đủ thông tin.
 - BottomSheet "Bộ lọc": môn / quận / khoảng giá (slider) / tiện ích / rating.
-- Toggle map view (placeholder).
+- Toolbar có **nút "Bản đồ"** mở Map view (xem § 6.5).
 - Empty state khi không có kết quả.
+
+### 6.5. Venues map view (`/venues/map`)
+
+Full-screen OpenStreetMap (`flutter_map` 7.0.2 + `latlong2` 0.9.1, tile từ `tile.openstreetmap.org`). Vào từ nút "Bản đồ" trên toolbar `/venues`.
+
+**Tính năng**:
+- **Custom pin marker** vẽ bằng `CustomPainter` (hình giọt nước có icon môn ở giữa) — màu theo môn primary của venue (football=green, badminton=blue, tennis=warning, pickleball=accent, basketball=danger, volleyball=violet, table_tennis=cyan).
+- **Marker được chọn** scale 1.15× + viền trắng + label giá `350k` phía trên.
+- **My location dot** chấm xanh có halo, đặt tại Q.1 (`MockData.mapCenter`).
+- **Header floating** (gradient fade): nút back tròn, ô search (filter theo `name/district/address`), nút filter có badge khi đang lọc, dải sport chip cuộn ngang.
+- **Pill "Tìm sân trong khu vực này"** xuất hiện khi user pan map > 1km từ initial center (đo bằng `Distance().distance()`).
+- **Filter sheet**: RangeSlider giá 0-600k chia 12 step, switch indoor-only, wrap FilterChip cho amenities. Footer 2 nút "Đặt lại / Xem N sân".
+- **3 FAB tròn** bên phải (top): my location (recenter), layers (style switcher), list_alt (back to list view).
+- **DraggableScrollableSheet** snap 3 mức (16% / 50% / 88%): handle bar, "N sân — Đang lọc", "Xoá lọc" pill, list tile mỗi venue (image + name + rating + district + giá + arrow detail). Tap tile → focus marker.
+- **Selected venue card** (overlay bottom 110): image 70×70 + name + rating + district + km + giá, nút close, 2 nút "Chỉ đường / Xem chi tiết". Tap card → đi tới venue detail.
+- **OSM attribution** "© OpenStreetMap" bottom-left góc.
+
+**Mock data**: tọa độ 6 venue ở `MockData.venueLocations` (Map<id, (lat, lng)>) — TP.HCM Q1/Q7/Q10/Bình Thạnh/Thủ Đức. Khi nối API, đọc từ `venue.lat/lng` trên Prisma schema (đã có sẵn — xem [API_INTEGRATION.md § 3](API_INTEGRATION.md#3-venue)).
+
+**Lưu ý kỹ thuật**:
+- `dart:ui as ui` để tránh conflict với `Path<LatLng>` của flutter_map khi vẽ pin (xem GOTCHAS.md §17).
+- Const tuple destructuring `MockData.mapCenter.$1` không hoạt động trong const expression — phải dùng `LatLng(...)` non-const.
+- Tile cache mặc định in-memory của flutter_map. Nếu cần persistent, thêm `flutter_map_tile_caching`.
 
 ### 7. Venue detail
 - SliverAppBar collapse (hero image full-width).

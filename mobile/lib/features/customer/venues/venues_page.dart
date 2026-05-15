@@ -113,7 +113,7 @@ class _VenuesPageState extends State<VenuesPage> {
               ),
             ),
 
-            // Toolbar: count + sort
+            // Toolbar: count + map + sort
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               sliver: SliverToBoxAdapter(
@@ -124,6 +124,37 @@ class _VenuesPageState extends State<VenuesPage> {
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const Spacer(),
+                    InkWell(
+                      onTap: () => context.push(RoutePaths.venuesMap),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.3)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.map_outlined,
+                                size: 14, color: AppColors.primary),
+                            SizedBox(width: 4),
+                            Text(
+                              'Bản đồ',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     InkWell(
                       onTap: _showSortSheet,
                       child: Row(

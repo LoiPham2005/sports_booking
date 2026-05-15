@@ -37,6 +37,7 @@ class RoutePaths {
   static const staffBookingDetailParam = '/staff/bookings/:id';
 
   static const venues = '/venues';
+  static const venuesMap = '/venues/map';
   static String venueDetail(String id) => '/venues/$id';
   static const venueDetailParam = '/venues/:id';
 

@@ -218,9 +218,50 @@ Cẩn thận khi code:
 - **ADMIN** thấy tất cả nhưng không config hệ thống
 - **SUPER_ADMIN** mọi quyền + `/admin/system/*`
 
+## 17. Mobile map: `Path` conflict với `flutter_map` + const tuple
+
+Khi viết `venues_map_page.dart` dùng `flutter_map: ^7.0.2`, gặp 2 vấn đề:
+
+**a) `Path` ambiguous**: `flutter_map` export class `Path<R>` (route path) — đụng tên với `dart:ui.Path` của Canvas drawing. Khi viết `CustomPainter` để vẽ pin marker, `Path()` bị resolve thành `Path<LatLng>` của flutter_map → lỗi `The method 'addOval' isn't defined`.
+
+**Fix**: import `dart:ui` với prefix và dùng `ui.Path()`:
+```dart
+import 'dart:ui' as ui;
+// ...
+final path = ui.Path();
+path.addOval(Rect.fromCircle(...));
+```
+
+**b) Const tuple destructuring**: muốn dùng `const LatLng(MockData.mapCenter.$1, MockData.mapCenter.$2)` cho field initializer → analyzer báo "property '$1' can't be accessed on the type '(double, double)' in a constant expression".
+
+**Fix**: bỏ `const`, dùng non-const `LatLng(...)` constructor. Records (`(double, double)`) chưa support const destructuring.
+
+## 18. Mobile: `BottomAppBar` + notch + FAB → assertion lúc hit-test
+
+`MainShell` ban đầu dùng `BottomAppBar(shape: CircularNotchedRectangle(), notchMargin: 8)` + `FAB centerDocked` để tạo notch lõm cho FAB. Sau khi push route mới (vd: `/venues/map`) rồi back về, tap màn hình bất kỳ → throw:
+
+```
+Scaffold.geometryOf() must only be accessed during the paint phase.
+…
+_BottomAppBarClipper.getClip
+_ScaffoldGeometryNotifier.value
+```
+
+**Nguyên nhân**: `_BottomAppBarClipper.getClip()` gọi `Scaffold.geometryOf(context).value` để tính clip path. Nhưng `value` getter có assert chỉ cho phép access khi `debugDoingPaint == true`. Hit-test phase thì `debugDoingPaint == false` → throw.
+
+Đây là [Flutter issue #79722](https://github.com/flutter/flutter/issues/79722), mở từ 2021, chưa fix. Trigger sau push/pop route vì rebuild ordering bị xáo trộn.
+
+**Fix đã áp dụng** ([main_shell.dart](mobile/lib/features/customer/main/main_shell.dart)):
+- Bỏ `BottomAppBar` widget hoàn toàn.
+- Dùng `Container` thường với `border-top + boxShadow` để giả lập bottom bar.
+- Đổi `floatingActionButtonLocation: centerDocked` → `centerFloat` + thêm `Padding(bottom: 6)` để FAB float đẹp.
+- Vì không có notch, tăng `SizedBox(width: 40)` → `SizedBox(width: 56)` cho gap giữa cân hơn.
+
+**Tránh sử dụng `BottomAppBar` với `shape != null`**. Nếu cần notch, tự vẽ bằng `CustomPainter`.
+
 ## Lưu ý chung khi code
 
-- **Không thêm dependency mới** trừ khi thực sự cần. Web hiện 9 deps, mobile 6 deps — giữ tinh gọn.
+- **Không thêm dependency mới** trừ khi thực sự cần. Web hiện 9 deps, mobile 8 deps (+ `flutter_map`, `latlong2` cho map view) — giữ tinh gọn.
 - **Không generate code mới** (codegen) — đã chọn không dùng từ đầu để dev mới đọc code dễ.
 - **Mock data tập trung** một file (`lib/mock-data.ts` web, `lib/shared/mock/mock_data.dart` mobile). Khi nối API: chỉ swap file đó.
 - **Đồng bộ design system web/mobile**: 2 ngôn ngữ token cùng giá trị. Khi đổi màu primary, đổi cả 2 chỗ.
