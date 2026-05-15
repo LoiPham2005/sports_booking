@@ -72,7 +72,8 @@ sports_booking/
 │   ├── DATABASE.md              Prisma schema + index + constraints
 │   ├── FRONTEND.md              Web sitemap + RBAC matrix + components
 │   ├── MOBILE.md                Mobile sitemap + customer/owner/staff portals
-│   └── API_INTEGRATION.md       🔌 Mapping UI mock ↔ DB schema (đọc trước khi nối API)
+│   ├── API_INTEGRATION.md       🔌 Mapping UI mock ↔ DB schema (đọc trước khi nối API)
+│   └── API_INTEGRATION_PLAN.md  📋 Roadmap 8 phase nối API web (Customer → Owner → ... → SuperAdmin)
 │
 ├── backend/                     NestJS API
 │   ├── prisma/schema.prisma     27 models (User, Venue, Court, Booking, Payment, ...)

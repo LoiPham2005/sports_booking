@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { SlidersHorizontal, MapIcon, List, Search } from 'lucide-react';
 import { Header } from '@/components/shared/header';
 import { Footer } from '@/components/shared/footer';
@@ -9,19 +10,53 @@ import { VenueCard } from '@/components/shared/venue-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { SPORTS, VENUES, AMENITIES } from '@/lib/mock-data';
+import { AMENITIES } from '@/lib/mock-data';
+import { listVenues, listSports, type UiVenue, type UiSport } from '@/lib/data/venues';
 import { cn } from '@/lib/utils';
+import { Suspense } from 'react';
 
 const SORT_OPTIONS = [
-  { value: 'distance', label: 'Gần nhất' },
   { value: 'rating', label: 'Đánh giá cao' },
-  { value: 'price_asc', label: 'Giá tăng dần' },
-  { value: 'price_desc', label: 'Giá giảm dần' },
+  { value: 'newest', label: 'Mới nhất' },
 ];
 
-export default function VenuesPage() {
+function VenuesInner() {
+  const searchParams = useSearchParams();
+  const initialSport = searchParams.get('sport') ?? '';
+  const initialQ = searchParams.get('q') ?? '';
+
   const [view, setView] = useState<'list' | 'map'>('list');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [sport, setSport] = useState(initialSport);
+  const [q, setQ] = useState(initialQ);
+  const [sortBy, setSortBy] = useState<'rating' | 'newest'>('rating');
+
+  const [venues, setVenues] = useState<UiVenue[]>([]);
+  const [sports, setSports] = useState<UiSport[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Load sports once
+  useEffect(() => {
+    listSports().then(setSports).catch(() => {});
+  }, []);
+
+  // Reload venues khi filter đổi (debounce search 300ms)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setLoading(true);
+      listVenues({ sportSlug: sport || undefined, q: q || undefined, sortBy })
+        .then(setVenues)
+        .catch(() => setVenues([]))
+        .finally(() => setLoading(false));
+    }, q ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [sport, q, sortBy]);
+
+  function resetFilters() {
+    setSport('');
+    setQ('');
+    setSortBy('rating');
+  }
 
   return (
     <>
@@ -33,7 +68,8 @@ export default function VenuesPage() {
           <p className="text-xs text-muted-foreground">Trang chủ / Khám phá sân</p>
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Sân thể thao tại Hồ Chí Minh</h1>
           <p className="text-sm text-muted-foreground">
-            Tìm thấy <span className="font-semibold text-foreground">{VENUES.length}</span> sân
+            Tìm thấy <span className="font-semibold text-foreground">{venues.length}</span> sân
+            {loading && ' (đang tải...)'}
           </p>
         </div>
 
@@ -41,14 +77,15 @@ export default function VenuesPage() {
         <div className="mt-4 flex flex-col gap-2 rounded-xl border bg-card p-3 shadow-sm md:flex-row md:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Tên sân, địa chỉ..." className="pl-9" />
+            <Input
+              placeholder="Tên sân, địa chỉ..."
+              className="pl-9"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
           </div>
           <Input placeholder="Quận / Huyện" className="md:max-w-[180px]" />
           <Input type="date" className="md:max-w-[180px]" />
-          <Button>
-            <Search className="h-4 w-4" />
-            Tìm
-          </Button>
           <Button variant="outline" className="md:hidden" onClick={() => setFilterOpen(!filterOpen)}>
             <SlidersHorizontal className="h-4 w-4" />
             Lọc
@@ -65,11 +102,27 @@ export default function VenuesPage() {
           >
             <FilterBlock title="Môn thể thao">
               <div className="flex flex-wrap gap-1.5">
-                {SPORTS.slice(0, 6).map((s) => (
+                <button
+                  type="button"
+                  onClick={() => setSport('')}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-medium',
+                    !sport ? 'border-primary bg-primary/10 text-primary' : 'hover:border-primary hover:bg-primary/5',
+                  )}
+                >
+                  Tất cả
+                </button>
+                {sports.slice(0, 8).map((s) => (
                   <button
                     key={s.slug}
                     type="button"
-                    className="rounded-full border px-3 py-1 text-xs font-medium hover:border-primary hover:bg-primary/5"
+                    onClick={() => setSport(s.slug)}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs font-medium',
+                      sport === s.slug
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'hover:border-primary hover:bg-primary/5',
+                    )}
                   >
                     {s.icon} {s.name}
                   </button>
@@ -126,7 +179,7 @@ export default function VenuesPage() {
               </div>
             </FilterBlock>
 
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full" onClick={resetFilters}>
               Xoá bộ lọc
             </Button>
           </aside>
@@ -136,12 +189,19 @@ export default function VenuesPage() {
             {/* Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">Cầu lông</Badge>
-                <Badge variant="outline">Quận 1, HCM</Badge>
-                <Badge variant="outline">Hôm nay 18:00–20:00</Badge>
+                {sport && (
+                  <Badge variant="outline">
+                    {sports.find((s) => s.slug === sport)?.name ?? sport}
+                  </Badge>
+                )}
+                {q && <Badge variant="outline">Tìm: {q}</Badge>}
               </div>
               <div className="flex items-center gap-2">
-                <select className="h-9 rounded-md border bg-background px-3 text-sm">
+                <select
+                  className="h-9 rounded-md border bg-background px-3 text-sm"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'rating' | 'newest')}
+                >
                   {SORT_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
                       Sắp xếp: {o.label}
@@ -172,11 +232,29 @@ export default function VenuesPage() {
             </div>
 
             {view === 'list' ? (
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                {VENUES.map((v) => (
-                  <VenueCard key={v.id} venue={v} />
-                ))}
-              </div>
+              loading && venues.length === 0 ? (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="h-72 animate-pulse rounded-xl border bg-muted/30" />
+                  ))}
+                </div>
+              ) : venues.length === 0 ? (
+                <div className="rounded-xl border bg-card p-12 text-center">
+                  <p className="text-sm font-semibold">Không tìm thấy sân nào</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Thử mở rộng bộ lọc hoặc đổi từ khoá tìm kiếm
+                  </p>
+                  <Button variant="outline" className="mt-4" onClick={resetFilters}>
+                    Xoá toàn bộ bộ lọc
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {venues.map((v) => (
+                    <VenueCard key={v.id} venue={v} />
+                  ))}
+                </div>
+              )
             ) : (
               <div className="relative h-[600px] overflow-hidden rounded-xl border bg-muted">
                 <div className="absolute inset-0 grid place-items-center">
@@ -190,16 +268,11 @@ export default function VenuesPage() {
                     </p>
                   </div>
                 </div>
-                {/* Mini pins decoration */}
                 <div className="absolute left-[20%] top-[30%] h-3 w-3 rounded-full bg-primary ring-4 ring-primary/20" />
                 <div className="absolute left-[50%] top-[60%] h-3 w-3 rounded-full bg-primary ring-4 ring-primary/20" />
                 <div className="absolute left-[75%] top-[40%] h-3 w-3 rounded-full bg-primary ring-4 ring-primary/20" />
               </div>
             )}
-
-            <div className="mt-8 flex justify-center">
-              <Button variant="outline">Xem thêm sân</Button>
-            </div>
           </section>
         </div>
       </main>
@@ -207,6 +280,14 @@ export default function VenuesPage() {
       <Footer />
       <MobileNav />
     </>
+  );
+}
+
+export default function VenuesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-muted/30" />}>
+      <VenuesInner />
+    </Suspense>
   );
 }
 

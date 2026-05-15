@@ -1,8 +1,45 @@
+'use client';
+
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
+import { authApi } from '@/lib/api/endpoints/auth';
+import { homePathByRole } from '@/lib/api/adapters/user';
+import { USE_MOCK } from '@/lib/api/config';
+import { isApiError } from '@/lib/api/errors';
 
-export default function LoginPage() {
+function LoginInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get('next');
+
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!identifier || !password) {
+      toast.error('Vui lòng nhập đủ thông tin');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const result = await authApi.login({ identifier, password });
+      toast.success(`Xin chào, ${result.user.fullName}`);
+      router.replace(nextPath || homePathByRole(result.user.role));
+      router.refresh();
+    } catch (e) {
+      const msg = isApiError(e) ? e.message : 'Đăng nhập thất bại';
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -12,7 +49,7 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <Button variant="outline" className="w-full" size="lg">
+      <Button variant="outline" className="w-full" size="lg" disabled>
         <GoogleIcon /> Đăng nhập với Google
       </Button>
 
@@ -25,10 +62,17 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <form className="space-y-4">
+      <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-1.5">
           <Label htmlFor="id">Email hoặc số điện thoại</Label>
-          <Input id="id" type="text" placeholder="ban@example.com hoặc 09xxxxxxxx" />
+          <Input
+            id="id"
+            type="text"
+            placeholder="ban@example.com hoặc 09xxxxxxxx"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            autoComplete="username"
+          />
         </div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
@@ -37,14 +81,21 @@ export default function LoginPage() {
               Quên mật khẩu?
             </Link>
           </div>
-          <Input id="pwd" type="password" placeholder="••••••••" />
+          <Input
+            id="pwd"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+          />
         </div>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" className="h-4 w-4 rounded border-input accent-primary" />
+          <input type="checkbox" className="h-4 w-4 rounded border-input accent-primary" defaultChecked />
           Ghi nhớ đăng nhập trên thiết bị này
         </label>
-        <Button size="lg" className="w-full">
-          Đăng nhập
+        <Button size="lg" className="w-full" type="submit" disabled={submitting}>
+          {submitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
         </Button>
       </form>
 
@@ -55,45 +106,65 @@ export default function LoginPage() {
         </Link>
       </p>
 
-      {/* Demo role switcher */}
-      <div className="rounded-xl border border-dashed bg-muted/40 p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent">
-            Demo
-          </span>
-          <span className="text-sm font-semibold">Đăng nhập nhanh theo role</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          <Link href="/" className="rounded-md border bg-background p-3 text-center transition-all hover:border-primary hover:bg-primary/5">
-            <div className="text-xl">👤</div>
-            <div className="mt-1 text-xs font-bold text-primary">Customer</div>
-          </Link>
-          <Link href="/owner" className="rounded-md border bg-background p-3 text-center transition-all hover:border-accent hover:bg-accent/5">
-            <div className="text-xl">🏟️</div>
-            <div className="mt-1 text-xs font-bold text-accent">Owner</div>
-          </Link>
-          <Link
-            href="/staff"
-            className="rounded-md border bg-background p-3 text-center transition-all hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/20"
-          >
-            <div className="text-xl">🔧</div>
-            <div className="mt-1 text-xs font-bold text-orange-500">Staff</div>
-          </Link>
-          <Link
-            href="/staff?role=manager"
-            className="rounded-md border bg-background p-3 text-center transition-all hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/20"
-          >
-            <div className="text-xl">👑</div>
-            <div className="mt-1 text-xs font-bold text-violet-500">Manager</div>
-          </Link>
-          <Link
-            href="/admin"
-            className="rounded-md border bg-background p-3 text-center transition-all hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-          >
-            <div className="text-xl">⚡</div>
-            <div className="mt-1 text-xs font-bold text-purple-500">Admin</div>
-          </Link>
-        </div>
+      {USE_MOCK && <DemoChips />}
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="h-96" />}>
+      <LoginInner />
+    </Suspense>
+  );
+}
+
+/** Demo chip switcher — chỉ hiện khi USE_MOCK=true. Phase 1 mới kết: nối API thật. */
+function DemoChips() {
+  return (
+    <div className="rounded-xl border border-dashed bg-muted/40 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent">
+          Demo (mock)
+        </span>
+        <span className="text-sm font-semibold">Đăng nhập nhanh theo role</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <Link
+          href="/"
+          className="rounded-md border bg-background p-3 text-center transition-all hover:border-primary hover:bg-primary/5"
+        >
+          <div className="text-xl">👤</div>
+          <div className="mt-1 text-xs font-bold text-primary">Customer</div>
+        </Link>
+        <Link
+          href="/owner"
+          className="rounded-md border bg-background p-3 text-center transition-all hover:border-accent hover:bg-accent/5"
+        >
+          <div className="text-xl">🏟️</div>
+          <div className="mt-1 text-xs font-bold text-accent">Owner</div>
+        </Link>
+        <Link
+          href="/staff"
+          className="rounded-md border bg-background p-3 text-center transition-all hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/20"
+        >
+          <div className="text-xl">🔧</div>
+          <div className="mt-1 text-xs font-bold text-orange-500">Staff</div>
+        </Link>
+        <Link
+          href="/staff?role=manager"
+          className="rounded-md border bg-background p-3 text-center transition-all hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/20"
+        >
+          <div className="text-xl">👑</div>
+          <div className="mt-1 text-xs font-bold text-violet-500">Manager</div>
+        </Link>
+        <Link
+          href="/admin"
+          className="rounded-md border bg-background p-3 text-center transition-all hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+        >
+          <div className="text-xl">⚡</div>
+          <div className="mt-1 text-xs font-bold text-purple-500">Admin</div>
+        </Link>
       </div>
     </div>
   );

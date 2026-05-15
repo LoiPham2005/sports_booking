@@ -17,7 +17,7 @@ import {
   ResetPasswordDto,
 } from './dto/login.dto';
 
-interface AuthResult {
+export interface AuthResult {
   accessToken: string;
   refreshToken: string;
   user: Pick<User, 'id' | 'email' | 'phone' | 'fullName' | 'role' | 'avatarUrl'>;

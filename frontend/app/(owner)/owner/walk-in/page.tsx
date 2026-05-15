@@ -1,16 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { formatVND } from '@/lib/format';
-
-const COURTS = [
-  { id: 'c1', name: 'Sân 1', price: 350_000 },
-  { id: 'c2', name: 'Sân 2', price: 350_000 },
-  { id: 'c3', name: 'Sân VIP', price: 500_000 },
-];
+import { listOwnerVenues, createWalkIn } from '@/lib/data/owner';
+import { isApiError } from '@/lib/api/errors';
+import type { UiVenue } from '@/lib/api/adapters/venue';
 
 const SLOTS = Array.from({ length: 16 }, (_, i) => `${String(6 + i).padStart(2, '0')}:00`);
 
@@ -20,19 +19,71 @@ const METHODS = [
   { id: 'vnpay', label: 'VNPay QR', desc: 'Tạo QR VNPay tại quầy' },
 ];
 
+// Pricing trong walk-in: owner nhập giá thủ công vì sân walk-in có thể có giá custom.
+// Default 350k/h cho mỗi slot 1h.
+const DEFAULT_HOURLY_RATE = 350_000;
+
 export default function OwnerWalkInPage() {
-  const [courtId, setCourtId] = useState('c1');
+  const router = useRouter();
+  const [venues, setVenues] = useState<UiVenue[]>([]);
+  const [venueId, setVenueId] = useState('');
+  const [courtId, setCourtId] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [method, setMethod] = useState('cash');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [notes, setNotes] = useState('');
+  const [hourlyRate, setHourlyRate] = useState(DEFAULT_HOURLY_RATE);
+  const [submitting, setSubmitting] = useState(false);
 
-  const court = COURTS.find((c) => c.id === courtId)!;
-  const total = selectedSlots.length * court.price;
+  useEffect(() => {
+    listOwnerVenues().then((list) => {
+      setVenues(list);
+      if (list.length > 0) {
+        setVenueId(list[0].id);
+        // Court IDs sẽ dùng theo venue. Vì page UI chưa fetch courts riêng,
+        // dùng prompt cho courtId hoặc để Owner gõ. Tạm thời prefill 'c1'.
+        setCourtId('c1');
+      }
+    });
+  }, []);
+
+  const total = selectedSlots.length * hourlyRate;
 
   const toggleSlot = (s: string) => {
     setSelectedSlots((prev) =>
       prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s].sort(),
     );
   };
+
+  async function handleSubmit() {
+    if (!courtId) return toast.error('Vui lòng chọn sân');
+    if (selectedSlots.length === 0) return toast.error('Chọn ít nhất 1 khung giờ');
+
+    const startsAt = new Date(`${date}T${selectedSlots[0]}:00`).toISOString();
+    const lastSlot = selectedSlots[selectedSlots.length - 1];
+    const [h, m] = lastSlot.split(':').map((x) => parseInt(x, 10));
+    const endsAt = new Date(`${date}T${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`).toISOString();
+
+    setSubmitting(true);
+    try {
+      const booking = await createWalkIn({
+        courtId,
+        startsAt,
+        endsAt,
+        total,
+        customerName: customerName || undefined,
+        customerPhone: customerPhone || undefined,
+      });
+      toast.success(`Đã tạo walk-in #${booking.code}`);
+      router.push('/owner/bookings');
+    } catch (e) {
+      toast.error(isApiError(e) ? e.message : 'Tạo walk-in thất bại');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -48,44 +99,82 @@ export default function OwnerWalkInPage() {
             <h3 className="font-bold">Thông tin khách</h3>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>Họ tên</Label>
-                <Input placeholder="Nguyễn Văn A" />
+                <Label htmlFor="customerName">Họ tên</Label>
+                <Input
+                  id="customerName"
+                  placeholder="Nguyễn Văn A"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
-                <Label>Số điện thoại</Label>
-                <Input placeholder="09xxxxxxxx" />
+                <Label htmlFor="customerPhone">Số điện thoại</Label>
+                <Input
+                  id="customerPhone"
+                  placeholder="09xxxxxxxx"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                />
               </div>
             </div>
           </Card>
 
-          {/* Court */}
+          {/* Venue + Court */}
           <Card className="p-6">
-            <h3 className="font-bold">Sân</h3>
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              {COURTS.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCourtId(c.id)}
-                  className={`rounded-md border-2 p-3 text-left transition-all ${
-                    courtId === c.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/40'
-                  }`}
+            <h3 className="font-bold">Venue + Sân</h3>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Venue</Label>
+                <select
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  value={venueId}
+                  onChange={(e) => setVenueId(e.target.value)}
                 >
-                  <p className="font-semibold">{c.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatVND(c.price)}/h</p>
-                </button>
-              ))}
+                  {venues.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="courtId">Mã sân (Court ID)</Label>
+                <Input
+                  id="courtId"
+                  placeholder="c1, c2..."
+                  value={courtId}
+                  onChange={(e) => setCourtId(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Lấy từ tab Sân trong venue. Tương lai sẽ là dropdown.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="rate">Đơn giá / giờ (VND)</Label>
+                <Input
+                  id="rate"
+                  type="number"
+                  value={hourlyRate}
+                  onChange={(e) => setHourlyRate(Number(e.target.value) || 0)}
+                  min={0}
+                  step={10000}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="date">Ngày</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                />
+              </div>
             </div>
           </Card>
 
           {/* Slots */}
           <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold">Khung giờ</h3>
-              <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-44" />
-            </div>
+            <h3 className="font-bold">Khung giờ</h3>
             <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-8">
               {SLOTS.map((s) => {
                 const active = selectedSlots.includes(s);
@@ -137,8 +226,14 @@ export default function OwnerWalkInPage() {
 
           {/* Notes */}
           <Card className="p-6">
-            <Label>Ghi chú (tuỳ chọn)</Label>
-            <Textarea placeholder="Vd: Khách quen, miễn phí nước, đội 6 người..." className="mt-2" />
+            <Label htmlFor="notes">Ghi chú (tuỳ chọn)</Label>
+            <Textarea
+              id="notes"
+              placeholder="Vd: Khách quen, miễn phí nước, đội 6 người..."
+              className="mt-2"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
           </Card>
         </div>
 
@@ -147,9 +242,8 @@ export default function OwnerWalkInPage() {
           <div className="sticky top-24 rounded-2xl border bg-card p-5 shadow-sm">
             <h3 className="font-bold">Tóm tắt</h3>
             <dl className="mt-4 space-y-2 text-sm">
-              <Row label="Sân" value={court.name} />
               <Row label="Số giờ" value={`${selectedSlots.length} giờ`} />
-              <Row label="Đơn giá" value={`${formatVND(court.price)}/h`} />
+              <Row label="Đơn giá" value={`${formatVND(hourlyRate)}/h`} />
               <Row label="Phương thức" value={METHODS.find((m) => m.id === method)?.label ?? ''} />
             </dl>
             <div className="my-4 border-t" />
@@ -157,11 +251,16 @@ export default function OwnerWalkInPage() {
               <span className="text-sm font-semibold">Tổng cộng</span>
               <span className="text-2xl font-bold text-primary">{formatVND(total)}</span>
             </div>
-            <Button size="lg" className="mt-4 w-full" disabled={selectedSlots.length === 0}>
-              Tạo booking
+            <Button
+              size="lg"
+              className="mt-4 w-full"
+              disabled={selectedSlots.length === 0 || submitting}
+              onClick={handleSubmit}
+            >
+              {submitting ? 'Đang tạo...' : 'Tạo booking'}
             </Button>
             <p className="mt-2 text-center text-xs text-muted-foreground">
-              Booking sẽ ở trạng thái CONFIRMED ngay
+              Booking sẽ ở trạng thái CONFIRMED ngay (đã thu tiền)
             </p>
           </div>
         </aside>

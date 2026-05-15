@@ -15,9 +15,13 @@ import { Header } from '@/components/shared/header';
 import { Footer } from '@/components/shared/footer';
 import { MobileNav } from '@/components/shared/mobile-nav';
 import { VenueCard } from '@/components/shared/venue-card';
-import { SPORTS, VENUES } from '@/lib/mock-data';
+import { listSports, listVenues } from '@/lib/data/venues';
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [sports, venues] = await Promise.all([
+    listSports(),
+    listVenues({ limit: 6, sortBy: 'rating' }),
+  ]);
   return (
     <>
       <Header />
@@ -124,7 +128,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-            {SPORTS.map((s) => (
+            {sports.map((s) => (
               <Link
                 key={s.slug}
                 href={`/venues?sport=${s.slug}`}
@@ -155,7 +159,7 @@ export default function HomePage() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {VENUES.slice(0, 6).map((v) => (
+            {venues.map((v) => (
               <VenueCard key={v.id} venue={v} />
             ))}
           </div>

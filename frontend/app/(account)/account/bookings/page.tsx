@@ -1,58 +1,98 @@
+'use client';
+
 import Link from 'next/link';
-import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { Calendar, ChevronRight, MapPin, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BOOKINGS, STATUS_LABEL, type Booking } from '@/lib/mock-data';
+import { STATUS_LABEL } from '@/lib/api/adapters/status';
 import { formatVND } from '@/lib/format';
+import { listMyBookings } from '@/lib/data/bookings';
+import type { UiBooking } from '@/lib/api/adapters/booking';
 
 export default function BookingsPage() {
-  const upcoming = BOOKINGS.filter((b) =>
-    ['PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN'].includes(b.status),
+  const [bookings, setBookings] = useState<UiBooking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    listMyBookings()
+      .then((list) => {
+        if (!cancelled) setBookings(list);
+      })
+      .catch(() => {
+        if (!cancelled) setBookings([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const upcoming = bookings.filter((b) =>
+    (['PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN'] as const).includes(b.status as never),
   );
-  const completed = BOOKINGS.filter((b) => b.status === 'COMPLETED');
-  const cancelled = BOOKINGS.filter((b) => b.status === 'CANCELLED');
+  const completed = bookings.filter((b) => b.status === 'COMPLETED');
+  const cancelled = bookings.filter(
+    (b) => b.status === 'CANCELLED' || b.status === 'NO_SHOW' || b.status === 'REFUNDED',
+  );
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Booking của tôi</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Theo dõi và quản lý các lượt đặt sân
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Theo dõi và quản lý các lượt đặt sân</p>
       </div>
 
-      <Tabs defaultValue="upcoming">
-        <TabsList>
-          <TabsTrigger value="upcoming">Sắp tới ({upcoming.length})</TabsTrigger>
-          <TabsTrigger value="completed">Hoàn thành ({completed.length})</TabsTrigger>
-          <TabsTrigger value="cancelled">Đã huỷ ({cancelled.length})</TabsTrigger>
-        </TabsList>
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-36 animate-pulse rounded-xl border bg-muted/30" />
+          ))}
+        </div>
+      ) : (
+        <Tabs defaultValue="upcoming">
+          <TabsList>
+            <TabsTrigger value="upcoming">Sắp tới ({upcoming.length})</TabsTrigger>
+            <TabsTrigger value="completed">Hoàn thành ({completed.length})</TabsTrigger>
+            <TabsTrigger value="cancelled">Đã huỷ ({cancelled.length})</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="upcoming" className="space-y-4">
-          {upcoming.length === 0 ? (
-            <EmptyState />
-          ) : (
-            upcoming.map((b) => <BookingCard key={b.id} booking={b} />)
-          )}
-        </TabsContent>
-        <TabsContent value="completed" className="space-y-4">
-          {completed.map((b) => (
-            <BookingCard key={b.id} booking={b} />
-          ))}
-        </TabsContent>
-        <TabsContent value="cancelled" className="space-y-4">
-          {cancelled.map((b) => (
-            <BookingCard key={b.id} booking={b} />
-          ))}
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="upcoming" className="space-y-4">
+            {upcoming.length === 0 ? (
+              <EmptyState />
+            ) : (
+              upcoming.map((b) => <BookingCard key={b.id} booking={b} />)
+            )}
+          </TabsContent>
+          <TabsContent value="completed" className="space-y-4">
+            {completed.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                Chưa có booking hoàn thành
+              </p>
+            ) : (
+              completed.map((b) => <BookingCard key={b.id} booking={b} />)
+            )}
+          </TabsContent>
+          <TabsContent value="cancelled" className="space-y-4">
+            {cancelled.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                Chưa có booking đã huỷ
+              </p>
+            ) : (
+              cancelled.map((b) => <BookingCard key={b.id} booking={b} />)
+            )}
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }
 
-function BookingCard({ booking }: { booking: Booking }) {
+function BookingCard({ booking }: { booking: UiBooking }) {
   const status = STATUS_LABEL[booking.status];
   const tone = status.tone as 'success' | 'warning' | 'destructive' | 'muted' | 'default';
   const start = new Date(booking.startsAt);
@@ -62,7 +102,14 @@ function BookingCard({ booking }: { booking: Booking }) {
     <article className="overflow-hidden rounded-xl border bg-card transition-shadow hover:shadow-md">
       <div className="flex flex-col gap-4 p-4 md:flex-row">
         <div className="relative h-40 w-full shrink-0 overflow-hidden rounded-lg md:h-28 md:w-40">
-          <Image src={booking.venue.image} alt={booking.venue.name} fill className="object-cover" />
+          {booking.venue.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={booking.venue.image}
+              alt={booking.venue.name}
+              className="h-full w-full object-cover"
+            />
+          )}
         </div>
 
         <div className="flex flex-1 flex-col">
@@ -98,17 +145,18 @@ function BookingCard({ booking }: { booking: Booking }) {
 
           <div className="mt-4 flex flex-wrap gap-2">
             {booking.status === 'PENDING_PAYMENT' && (
-              <Button size="sm">Thanh toán tiếp</Button>
+              <Button size="sm" asChild>
+                <Link href={`/account/bookings/${booking.id}`}>Thanh toán tiếp</Link>
+              </Button>
             )}
-            {booking.status === 'CONFIRMED' && <Button size="sm">Mã QR check-in</Button>}
+            {booking.status === 'CONFIRMED' && (
+              <Button size="sm" asChild>
+                <Link href={`/account/bookings/${booking.id}`}>Mã QR check-in</Link>
+              </Button>
+            )}
             {booking.status === 'COMPLETED' && (
               <Button size="sm" variant="outline">
                 <Star className="h-4 w-4" /> Đánh giá
-              </Button>
-            )}
-            {(booking.status === 'PENDING_PAYMENT' || booking.status === 'CONFIRMED') && (
-              <Button size="sm" variant="ghost">
-                Huỷ booking
               </Button>
             )}
             <Button size="sm" variant="ghost" asChild className="ml-auto">

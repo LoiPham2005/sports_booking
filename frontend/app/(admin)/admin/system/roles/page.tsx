@@ -1,34 +1,76 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Crown, Shield, ChevronDown, Plus } from 'lucide-react';
+import { Crown, Search } from 'lucide-react';
+import { listAdmins, setUserRole } from '@/lib/data/system';
+import { listAdminUsers } from '@/lib/data/admin';
+import { isApiError } from '@/lib/api/errors';
+import type { AdminUserListItem } from '@/lib/api/endpoints/system';
+import type { AdminUserDto } from '@/lib/api/endpoints/admin';
+import type { Role } from '@/lib/api/types';
 
-const ADMINS = [
-  { name: 'Admin System', email: 'admin@sportsbooking.local', role: 'SUPER_ADMIN', addedBy: '—', addedAt: '2024-12-01' },
-  { name: 'Phạm Quốc Anh', email: 'anh@sportsbooking.local', role: 'ADMIN', addedBy: 'Admin System', addedAt: '2025-03-04' },
-  { name: 'Lê Thị Mai', email: 'mai@sportsbooking.local', role: 'ADMIN', addedBy: 'Admin System', addedAt: '2025-09-18' },
-];
-
-const PERMISSIONS_BY_ROLE = {
-  ADMIN: [
-    'Xem dashboard tổng',
-    'Duyệt venue',
-    'Quản lý user (suspend/restore)',
-    'Xử lý disputes',
-    'Quản lý vouchers',
-    'Xem audit log',
-  ],
-  SUPER_ADMIN: [
-    'Tất cả quyền của ADMIN',
-    'Cài đặt hệ thống (commission, payout, ...)',
-    'Quản lý role admin',
-    'Bật/tắt feature flags',
-    'Truy cập database trực tiếp',
-  ],
+const ROLE_TONE: Record<Role, 'destructive' | 'accent' | 'warning' | 'default'> = {
+  CUSTOMER: 'default',
+  OWNER: 'accent',
+  STAFF: 'warning',
+  ADMIN: 'destructive',
+  SUPER_ADMIN: 'destructive',
 };
 
 export default function SystemRolesPage() {
+  const [admins, setAdmins] = useState<AdminUserListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [showPromote, setShowPromote] = useState(false);
+  const [q, setQ] = useState('');
+  const [searchResults, setSearchResults] = useState<AdminUserDto[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    listAdmins()
+      .then(setAdmins)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!showPromote) return;
+    if (!q.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      setSearching(true);
+      listAdminUsers({ q })
+        .then(({ data }) =>
+          setSearchResults(data.filter((u) => u.role === 'CUSTOMER' || u.role === 'OWNER')),
+        )
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q, showPromote]);
+
+  async function handleSetRole(id: string, role: Role, name: string) {
+    if (!confirm(`Đổi role của ${name} sang ${role}?`)) return;
+    try {
+      await setUserRole(id, role);
+      toast.success(`Đã đổi role sang ${role}`);
+      const list = await listAdmins();
+      setAdmins(list);
+      setShowPromote(false);
+      setQ('');
+    } catch (e) {
+      toast.error(isApiError(e) ? e.message : 'Đổi role thất bại');
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -36,112 +78,136 @@ export default function SystemRolesPage() {
           <Badge variant="destructive">
             <Crown className="mr-1 h-3 w-3" /> SUPER ADMIN
           </Badge>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Quản lý Role admin</h1>
-          <p className="text-sm text-muted-foreground">
-            Cấp quyền ADMIN / SUPER_ADMIN cho user. Hiện có {ADMINS.length} admin.
-          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">Quản lý role</h1>
+          <p className="text-sm text-muted-foreground">Cấp/thu hồi quyền ADMIN, SUPER_ADMIN</p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4" /> Cấp quyền admin
-        </Button>
+        <Button onClick={() => setShowPromote(!showPromote)}>Cấp quyền admin</Button>
       </div>
 
-      <Card className="overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/30 text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3 text-left font-medium">Admin</th>
-              <th className="px-4 py-3 text-center font-medium">Role</th>
-              <th className="px-4 py-3 text-left font-medium">Cấp bởi</th>
-              <th className="px-4 py-3 text-center font-medium">Từ ngày</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {ADMINS.map((a) => (
-              <tr key={a.email} className="border-b last:border-0 hover:bg-muted/30">
-                <td className="px-4 py-3">
+      {showPromote && (
+        <Card className="border-primary/40 bg-primary/5 p-6">
+          <h3 className="font-bold">Cấp quyền ADMIN cho user</h3>
+          <p className="text-sm text-muted-foreground">Tìm user (CUSTOMER/OWNER) theo email/tên</p>
+          <div className="relative mt-4">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Tìm theo email, tên..."
+              className="pl-9"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          {searching ? (
+            <p className="mt-4 text-sm text-muted-foreground">Đang tìm...</p>
+          ) : searchResults.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              {searchResults.slice(0, 5).map((u) => (
+                <div
+                  key={u.id}
+                  className="flex items-center justify-between rounded-lg border bg-background p-3"
+                >
                   <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarFallback>{a.name[0]}</AvatarFallback>
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback className="text-xs">{u.fullName[0]}</AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{a.name}</p>
-                      <p className="text-xs text-muted-foreground">{a.email}</p>
+                      <p className="font-medium">{u.fullName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {u.email ?? '—'} · {u.role}
+                      </p>
                     </div>
                   </div>
-                </td>
-                <td className="px-4 py-3 text-center">
-                  {a.role === 'SUPER_ADMIN' ? (
-                    <Badge variant="destructive">
-                      <Crown className="mr-1 h-3 w-3" />
-                      SUPER_ADMIN
-                    </Badge>
-                  ) : (
-                    <Badge variant="accent">
-                      <Shield className="mr-1 h-3 w-3" />
-                      ADMIN
-                    </Badge>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">{a.addedBy}</td>
-                <td className="px-4 py-3 text-center text-muted-foreground">{a.addedAt}</td>
-                <td className="px-4 py-3 text-right">
-                  {a.role !== 'SUPER_ADMIN' && (
-                    <div className="inline-flex gap-1">
-                      <Button size="sm" variant="outline">
-                        Demote
-                      </Button>
-                      <Button size="sm" variant="ghost">
-                        Promote <ChevronDown className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                </td>
+                  <Button size="sm" onClick={() => handleSetRole(u.id, 'ADMIN', u.fullName)}>
+                    Cấp ADMIN
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : q ? (
+            <p className="mt-4 text-sm text-muted-foreground">Không tìm thấy user phù hợp</p>
+          ) : null}
+        </Card>
+      )}
+
+      <Card className="overflow-hidden">
+        {loading ? (
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-14 animate-pulse rounded bg-muted/30" />
+            ))}
+          </div>
+        ) : admins.length === 0 ? (
+          <p className="py-12 text-center text-sm text-muted-foreground">Chưa có admin nào</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="border-b bg-muted/30 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium">Admin</th>
+                <th className="px-4 py-3 text-center font-medium">Role</th>
+                <th className="px-4 py-3 text-center font-medium">Vào ngày</th>
+                <th className="px-4 py-3 text-right font-medium">Hành động</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {admins.map((u) => (
+                <tr key={u.id} className="border-b last:border-0 hover:bg-muted/20">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-9 w-9">
+                        <AvatarFallback className="text-xs">{u.fullName[0]}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{u.fullName}</p>
+                        <p className="text-xs text-muted-foreground">{u.email ?? '—'}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <Badge variant={ROLE_TONE[u.role] as never}>
+                      {u.role === 'SUPER_ADMIN' && <Crown className="mr-1 h-3 w-3" />}
+                      {u.role}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-center text-xs text-muted-foreground">
+                    {new Date(u.createdAt).toLocaleDateString('vi-VN')}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {u.role === 'ADMIN' && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleSetRole(u.id, 'SUPER_ADMIN', u.fullName)}
+                        >
+                          Promote SUPER_ADMIN
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          onClick={() => handleSetRole(u.id, 'CUSTOMER', u.fullName)}
+                        >
+                          Thu hồi
+                        </Button>
+                      </>
+                    )}
+                    {u.role === 'SUPER_ADMIN' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive"
+                        onClick={() => handleSetRole(u.id, 'ADMIN', u.fullName)}
+                      >
+                        Demote ADMIN
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
-
-      {/* Permissions matrix */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="p-6">
-          <div className="flex items-center gap-2">
-            <Badge variant="accent">
-              <Shield className="mr-1 h-3 w-3" />
-              ADMIN
-            </Badge>
-            <h3 className="font-bold">Quyền của ADMIN</h3>
-          </div>
-          <ul className="mt-4 space-y-2 text-sm">
-            {PERMISSIONS_BY_ROLE.ADMIN.map((p) => (
-              <li key={p} className="flex items-start gap-2">
-                <span className="mt-0.5 text-success">✓</span>
-                <span>{p}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        <Card className="border-destructive/30 p-6">
-          <div className="flex items-center gap-2">
-            <Badge variant="destructive">
-              <Crown className="mr-1 h-3 w-3" />
-              SUPER_ADMIN
-            </Badge>
-            <h3 className="font-bold">Quyền của SUPER_ADMIN</h3>
-          </div>
-          <ul className="mt-4 space-y-2 text-sm">
-            {PERMISSIONS_BY_ROLE.SUPER_ADMIN.map((p) => (
-              <li key={p} className="flex items-start gap-2">
-                <span className="mt-0.5 text-destructive">★</span>
-                <span>{p}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
     </div>
   );
 }

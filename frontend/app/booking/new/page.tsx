@@ -1,41 +1,259 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Check, ChevronRight, Clock, MapPin, ShieldCheck, Timer } from 'lucide-react';
+import { toast } from 'sonner';
 import { Header } from '@/components/shared/header';
 import { Footer } from '@/components/shared/footer';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { VENUES, COURTS } from '@/lib/mock-data';
 import { formatVND } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { PaymentMethodPicker, type PaymentMethodKey } from '@/components/booking/payment-method';
+import { USE_MOCK } from '@/lib/api/config';
+import { bookingsApi, type QuoteResponse } from '@/lib/api/endpoints/bookings';
+import { paymentsApi } from '@/lib/api/endpoints/payments';
+import { getVenue } from '@/lib/data/venues';
+import { isApiError } from '@/lib/api/errors';
+import type { UiVenue } from '@/lib/api/adapters/venue';
+import type { PaymentProvider } from '@/lib/api/types';
 
 const STEPS = ['Xem lại', 'Thanh toán'] as const;
+const HOLD_TTL_SECONDS = 600; // 10 phút — phải khớp BOOKING_HOLD_MINUTES backend
 
-export default function BookingNewPage() {
+/** Parse `?slots=c1:18:00,19:00;c2:20:00` → { courtId, hours } cho court đầu tiên (Phase 2 chỉ hỗ trợ 1 court). */
+function parseSlots(raw: string | null): { courtId: string; hours: string[] } | null {
+  if (!raw) return null;
+  const decoded = decodeURIComponent(raw);
+  // Multiple courts có ';' phân tách. Lấy court đầu tiên.
+  const [firstCourtBlock] = decoded.split(';');
+  const [courtId, hoursStr] = firstCourtBlock.split(':');
+  if (!courtId || !hoursStr) return null;
+  const hours = hoursStr.split(',').filter(Boolean);
+  if (hours.length === 0) return null;
+  // Validate format HH:MM
+  for (const h of hours) {
+    if (!/^\d{2}:\d{2}$/.test(h)) return null;
+  }
+  return { courtId, hours: hours.sort() };
+}
+
+function toIso(date: string, hhmm: string): string {
+  // Local date + time → ISO. Backend expect ISO (timezone của browser).
+  // Vì venue ở VN, dùng giờ local (browser của VN user = UTC+7).
+  return new Date(`${date}T${hhmm}:00`).toISOString();
+}
+
+function nextHour(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map((x) => parseInt(x, 10));
+  return `${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function BookingNewInner() {
   const router = useRouter();
   const params = useSearchParams();
 
-  const venueId = params.get('venue') ?? 'v1';
-  const courtId = params.get('court') ?? 'c1';
+  const venueId = params.get('venue') ?? '';
   const date = params.get('date') ?? new Date().toISOString().split('T')[0];
-  const slotsRaw = params.get('slots') ?? '';
-  const slots = slotsRaw ? slotsRaw.split(',') : ['18:00', '19:00'];
+  const parsedSlots = useMemo(() => parseSlots(params.get('slots')), [params]);
 
-  const venue = VENUES.find((v) => v.id === venueId) ?? VENUES[0];
-  const court = COURTS.find((c) => c.id === courtId) ?? COURTS[0];
-  const subtotal = slots.length * court.pricePerHour;
-  const discount = 0;
-  const total = subtotal - discount;
+  const [venue, setVenue] = useState<UiVenue | null>(null);
+  const [quote, setQuote] = useState<QuoteResponse | null>(null);
+  const [quoting, setQuoting] = useState(true);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const [step, setStep] = useState<0 | 1>(0);
   const [method, setMethod] = useState<PaymentMethodKey>('vnpay');
   const [note, setNote] = useState('');
+  const [paying, setPaying] = useState(false);
+
+  // Countdown hold timer
+  const [secondsLeft, setSecondsLeft] = useState(HOLD_TTL_SECONDS);
+  const startTime = useRef<number | null>(null);
+
+  // Fetch venue info + quote on mount
+  useEffect(() => {
+    if (!venueId || !parsedSlots) {
+      setQuoteError('Thiếu thông tin sân hoặc khung giờ');
+      setQuoting(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const v = await getVenue(venueId);
+      if (cancelled) return;
+      setVenue(v);
+
+      if (USE_MOCK) {
+        // Mock quote — không gọi API
+        const subtotal = parsedSlots.hours.length * 350000;
+        setQuote({
+          courtId: parsedSlots.courtId,
+          startsAt: toIso(date, parsedSlots.hours[0]),
+          endsAt: toIso(date, nextHour(parsedSlots.hours[parsedSlots.hours.length - 1])),
+          slots: parsedSlots.hours.map((h) => ({
+            startsAt: toIso(date, h),
+            endsAt: toIso(date, nextHour(h)),
+            price: 350000,
+          })),
+          subtotal,
+          discount: 0,
+          total: subtotal,
+          holdToken: 'mock-hold-token',
+        });
+        startTime.current = Date.now();
+        setQuoting(false);
+        return;
+      }
+
+      try {
+        const startsAt = toIso(date, parsedSlots.hours[0]);
+        const endsAt = toIso(date, nextHour(parsedSlots.hours[parsedSlots.hours.length - 1]));
+        const q = await bookingsApi.quote({
+          courtId: parsedSlots.courtId,
+          startsAt,
+          endsAt,
+        });
+        if (cancelled) return;
+        setQuote(q);
+        startTime.current = Date.now();
+      } catch (e) {
+        const msg = isApiError(e) ? e.message : 'Không thể báo giá';
+        setQuoteError(msg);
+      } finally {
+        setQuoting(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venueId, date, parsedSlots?.courtId]);
+
+  // Countdown
+  useEffect(() => {
+    if (!quote || !startTime.current) return;
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - startTime.current!) / 1000);
+      setSecondsLeft(Math.max(0, HOLD_TTL_SECONDS - elapsed));
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [quote]);
+
+  // Auto redirect khi hết giờ
+  useEffect(() => {
+    if (secondsLeft === 0 && quote) {
+      toast.error('Phiên giữ chỗ đã hết hạn. Quay lại chọn lại khung giờ.');
+      router.replace(venueId ? `/venues/${venueId}` : '/');
+    }
+  }, [secondsLeft, quote, venueId, router]);
+
+  async function handlePay() {
+    if (!quote) return;
+    setPaying(true);
+    try {
+      // Step 1: create booking from hold
+      const booking = USE_MOCK
+        ? { id: 'mock-booking-id', code: '20260547' }
+        : await bookingsApi.create({ holdToken: quote.holdToken, notes: note });
+
+      // Step 2: create payment
+      const provider = method.toUpperCase() as PaymentProvider;
+      const returnUrl = `${window.location.origin}/booking/result`;
+
+      if (USE_MOCK) {
+        // Mock: chuyển thẳng tới result success
+        router.replace(`/booking/result?status=success&method=${method}&code=${booking.code}`);
+        return;
+      }
+
+      const payment = await paymentsApi.create({
+        bookingId: booking.id,
+        provider,
+        returnUrl,
+      });
+
+      if (payment.redirectUrl) {
+        // VNPay / MoMo flow — full page redirect
+        window.location.href = payment.redirectUrl;
+        return;
+      }
+      if (payment.qrData) {
+        // ZaloPay flow — đi tới result để render QR + poll
+        router.replace(`/booking/result?paymentId=${payment.id}`);
+        return;
+      }
+      // Edge case: provider trả về cả 2 đều null
+      toast.error('Không lấy được link thanh toán');
+    } catch (e) {
+      const msg = isApiError(e) ? e.message : 'Thanh toán thất bại';
+      toast.error(msg);
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  if (quoting) {
+    return (
+      <>
+        <Header />
+        <main className="container py-12">
+          <div className="mx-auto max-w-xl rounded-2xl border bg-card p-8 text-center">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="mt-4 text-sm text-muted-foreground">Đang giữ chỗ và báo giá...</p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  if (quoteError || !quote || !venue) {
+    return (
+      <>
+        <Header />
+        <main className="container py-12">
+          <div className="mx-auto max-w-xl rounded-2xl border bg-card p-8 text-center">
+            <p className="text-base font-semibold text-destructive">
+              {quoteError ?? 'Không thể đặt sân'}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Vui lòng quay lại trang sân và chọn lại khung giờ.
+            </p>
+            <Button asChild className="mt-4">
+              <Link href={venueId ? `/venues/${venueId}` : '/'}>
+                <ArrowLeft className="h-4 w-4" /> Quay lại
+              </Link>
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  const startHHmm = new Date(quote.startsAt).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const endHHmm = new Date(quote.endsAt).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const hoursCount = quote.slots.length;
+
+  const mins = Math.floor(secondsLeft / 60);
+  const secs = secondsLeft % 60;
+  const timerStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 
   return (
     <>
@@ -76,15 +294,18 @@ export default function BookingNewPage() {
                     {label}
                   </span>
                 </div>
-                {idx < STEPS.length - 1 && (
-                  <span className="h-px w-8 bg-border md:w-16" />
-                )}
+                {idx < STEPS.length - 1 && <span className="h-px w-8 bg-border md:w-16" />}
               </div>
             );
           })}
-          <div className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div
+            className={cn(
+              'ml-auto inline-flex items-center gap-1.5 text-xs',
+              secondsLeft < 60 ? 'text-destructive' : 'text-muted-foreground',
+            )}
+          >
             <Timer className="h-3.5 w-3.5 text-accent" />
-            Giữ chỗ trong <span className="font-semibold text-foreground">09:43</span>
+            Giữ chỗ trong <span className="font-mono font-semibold">{timerStr}</span>
           </div>
         </div>
 
@@ -97,23 +318,36 @@ export default function BookingNewPage() {
 
                 <div className="overflow-hidden rounded-xl border bg-card">
                   <div className="flex gap-4 p-4">
-                    <div className="relative h-24 w-32 shrink-0 overflow-hidden rounded-lg">
-                      <Image src={venue.image} alt={venue.name} fill className="object-cover" />
-                    </div>
+                    {venue.image && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={venue.image}
+                        alt={venue.name}
+                        className="h-24 w-32 shrink-0 rounded-lg object-cover"
+                      />
+                    )}
                     <div className="flex-1">
                       <h3 className="font-semibold">{venue.name}</h3>
                       <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground">
                         <MapPin className="h-3.5 w-3.5" />
                         {venue.district}, {venue.city}
                       </p>
-                      <Badge className="mt-2">{court.name} · Cỏ nhân tạo</Badge>
+                      <Badge className="mt-2">Sân {parsedSlots!.courtId}</Badge>
                     </div>
                   </div>
                 </div>
 
-                <DetailRow label="Ngày chơi" value={new Date(date).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })} />
-                <DetailRow label="Khung giờ" value={`${slots[0]} – ${addHour(slots[slots.length - 1])} (${slots.length} giờ)`} />
-                <DetailRow label="Sân" value={`${court.name} · ${formatVND(court.pricePerHour)}/h`} />
+                <DetailRow
+                  label="Ngày chơi"
+                  value={new Date(date).toLocaleDateString('vi-VN', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                  })}
+                />
+                <DetailRow label="Khung giờ" value={`${startHHmm} – ${endHHmm} (${hoursCount} giờ)`} />
+                <DetailRow label="Đơn giá trung bình" value={`${formatVND(Math.round(quote.subtotal / hoursCount))}/h`} />
 
                 <div>
                   <label className="text-sm font-medium">Ghi chú cho chủ sân (tuỳ chọn)</label>
@@ -151,22 +385,24 @@ export default function BookingNewPage() {
                       <p className="mt-1">
                         Bạn sẽ được chuyển sang trang của {method.toUpperCase()} để hoàn tất giao
                         dịch. Mọi thông tin được mã hoá đầu-cuối. Số tiền chính xác là{' '}
-                        <span className="font-semibold text-foreground">{formatVND(total)}</span>.
+                        <span className="font-semibold text-foreground">{formatVND(quote.total)}</span>.
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                  <Button variant="outline" onClick={() => setStep(0)}>
+                  <Button variant="outline" onClick={() => setStep(0)} disabled={paying}>
                     <ArrowLeft className="h-4 w-4" /> Quay lại
                   </Button>
-                  <Button
-                    size="lg"
-                    className="flex-1"
-                    onClick={() => router.push(`/booking/result?status=success&method=${method}`)}
-                  >
-                    Thanh toán {formatVND(total)} <ChevronRight className="h-4 w-4" />
+                  <Button size="lg" className="flex-1" onClick={handlePay} disabled={paying}>
+                    {paying ? (
+                      'Đang tạo giao dịch...'
+                    ) : (
+                      <>
+                        Thanh toán {formatVND(quote.total)} <ChevronRight className="h-4 w-4" />
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -179,21 +415,24 @@ export default function BookingNewPage() {
               <h3 className="font-bold">Tóm tắt</h3>
 
               <dl className="mt-4 space-y-2 text-sm">
-                <SummaryRow label="Sân" value={`${court.name}`} />
+                <SummaryRow label="Sân" value={parsedSlots!.courtId} />
                 <SummaryRow
                   label="Thời gian"
-                  value={`${new Date(date).toLocaleDateString('vi-VN')} · ${slots[0]}–${addHour(slots[slots.length - 1])}`}
+                  value={`${new Date(date).toLocaleDateString('vi-VN')} · ${startHHmm}–${endHHmm}`}
                 />
-                <SummaryRow label="Số giờ" value={`${slots.length} giờ`} />
-                <SummaryRow label="Đơn giá" value={formatVND(court.pricePerHour) + '/h'} />
+                <SummaryRow label="Số giờ" value={`${hoursCount} giờ`} />
               </dl>
 
               <div className="my-4 border-t" />
 
               <div className="space-y-1.5 text-sm">
-                <SummaryRow label="Tạm tính" value={formatVND(subtotal)} />
-                {discount > 0 && (
-                  <SummaryRow label="Giảm giá" value={`−${formatVND(discount)}`} highlight />
+                <SummaryRow label="Tạm tính" value={formatVND(quote.subtotal)} />
+                {quote.discount > 0 && (
+                  <SummaryRow
+                    label={`Giảm giá${quote.voucherCode ? ` (${quote.voucherCode})` : ''}`}
+                    value={`−${formatVND(quote.discount)}`}
+                    highlight
+                  />
                 )}
               </div>
 
@@ -201,12 +440,19 @@ export default function BookingNewPage() {
 
               <div className="flex items-end justify-between">
                 <span className="text-sm font-semibold">Tổng cộng</span>
-                <span className="text-2xl font-bold text-primary">{formatVND(total)}</span>
+                <span className="text-2xl font-bold text-primary">{formatVND(quote.total)}</span>
               </div>
 
-              <div className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+              <div
+                className={cn(
+                  'mt-4 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs',
+                  secondsLeft < 60
+                    ? 'bg-destructive/10 text-destructive'
+                    : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300',
+                )}
+              >
                 <Clock className="h-3.5 w-3.5" />
-                Giữ chỗ sẽ hết hạn sau 10 phút
+                Giữ chỗ sẽ hết hạn sau {timerStr}
               </div>
             </div>
           </aside>
@@ -215,6 +461,14 @@ export default function BookingNewPage() {
 
       <Footer />
     </>
+  );
+}
+
+export default function BookingNewPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-muted/30" />}>
+      <BookingNewInner />
+    </Suspense>
   );
 }
 
@@ -242,9 +496,4 @@ function SummaryRow({
       <dd className={cn('font-medium', highlight && 'text-success')}>{value}</dd>
     </div>
   );
-}
-
-function addHour(time: string): string {
-  const [h, m] = time.split(':');
-  return `${String(parseInt(h, 10) + 1).padStart(2, '0')}:${m}`;
 }

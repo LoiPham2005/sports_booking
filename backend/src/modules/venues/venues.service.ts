@@ -3,6 +3,49 @@ import { Prisma, Role, VenueStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateVenueDto, SearchVenuesDto, UpdateVenueDto } from './dto/venue.dto';
 
+/**
+ * Tham số include chuẩn cho venue card (search list + featured).
+ * Trả về đủ data UI mà không cần fetch lại nested.
+ */
+const venueCardInclude = {
+  images: { orderBy: { sort: 'asc' as const } },
+  amenities: { include: { amenity: true } },
+  courts: {
+    where: { isActive: true, deletedAt: null },
+    select: {
+      id: true,
+      sport: { select: { id: true, slug: true, nameVi: true, nameEn: true, icon: true } },
+      priceRules: { select: { pricePerSlot: true } },
+    },
+  },
+};
+
+/**
+ * Tham số include cho venue detail page (đầy đủ courts + reviews + hours).
+ */
+const venueDetailInclude = {
+  images: { orderBy: { sort: 'asc' as const } },
+  amenities: { include: { amenity: true } },
+  hours: { orderBy: { dayOfWeek: 'asc' as const } },
+  courts: {
+    where: { isActive: true, deletedAt: null },
+    include: {
+      sport: true,
+      priceRules: true,
+    },
+  },
+  owner: { select: { id: true, fullName: true, avatarUrl: true } },
+  reviews: {
+    where: { status: 'VISIBLE' as const },
+    orderBy: { createdAt: 'desc' as const },
+    take: 5,
+    include: {
+      user: { select: { id: true, fullName: true, avatarUrl: true } },
+    },
+  },
+  _count: { select: { reviews: { where: { status: 'VISIBLE' as const } } } },
+};
+
 @Injectable()
 export class VenuesService {
   constructor(private prisma: PrismaService) {}
@@ -31,32 +74,25 @@ export class VenuesService {
       take: limit + 1,
       cursor: dto.cursor ? { id: dto.cursor } : undefined,
       skip: dto.cursor ? 1 : 0,
-      orderBy: [{ ratingAvg: 'desc' }, { id: 'asc' }],
-      include: {
-        images: { where: { isPrimary: true }, take: 1 },
-        _count: { select: { courts: true } },
-      },
+      orderBy: this.orderByFor(dto.sortBy),
+      include: venueCardInclude,
     });
 
     const hasMore = items.length > limit;
-    const data = items.slice(0, limit);
+    const data = items.slice(0, limit).map((v) => this.enrichCard(v, dto));
     return {
       data,
       nextCursor: hasMore ? data[data.length - 1].id : null,
     };
   }
 
-  detail(id: string) {
-    return this.prisma.venue.findUniqueOrThrow({
-      where: { id },
-      include: {
-        images: true,
-        amenities: { include: { amenity: true } },
-        hours: true,
-        courts: { where: { isActive: true, deletedAt: null }, include: { sport: true } },
-        owner: { select: { id: true, fullName: true, avatarUrl: true } },
-      },
-    });
+  async detail(idOrSlug: string) {
+    // Hỗ trợ tra cứu cả id (cuid) lẫn slug. cuid bắt đầu bằng 'c' + dài 25 ký tự.
+    const isLikelyId = /^c[a-z0-9]{20,}$/i.test(idOrSlug);
+    const where = isLikelyId ? { id: idOrSlug } : { slug: idOrSlug };
+    const v = await this.prisma.venue.findUnique({ where, include: venueDetailInclude });
+    if (!v) throw new NotFoundException('Venue not found');
+    return this.enrichDetail(v);
   }
 
   async create(ownerId: string, dto: CreateVenueDto) {
@@ -138,6 +174,72 @@ export class VenuesService {
     return this.assertOwner(venueId, userId);
   }
 
+  // ─────────────────── Enrich helpers ───────────────────
+
+  /**
+   * Denormalize sports[], priceFrom, distance, flatten amenities cho venue card.
+   */
+  private enrichCard(
+    v: Prisma.VenueGetPayload<{ include: typeof venueCardInclude }>,
+    dto: SearchVenuesDto,
+  ) {
+    const sportMap = new Map<string, { id: string; slug: string; nameVi: string; nameEn: string; icon: string | null }>();
+    let minPrice: number | null = null;
+    for (const court of v.courts) {
+      if (court.sport) sportMap.set(court.sport.id, court.sport);
+      for (const rule of court.priceRules) {
+        const p = Number(rule.pricePerSlot);
+        if (minPrice === null || p < minPrice) minPrice = p;
+      }
+    }
+    const amenities = v.amenities.map((a) => a.amenity);
+    const distance =
+      dto.lat != null && dto.lng != null && v.lat != null && v.lng != null
+        ? haversineKm(dto.lat, dto.lng, Number(v.lat), Number(v.lng))
+        : undefined;
+
+    const { courts: _c, amenities: _a, ...rest } = v;
+    return {
+      ...rest,
+      sports: Array.from(sportMap.values()),
+      amenities,
+      priceFrom: minPrice ?? 0,
+      distance,
+    };
+  }
+
+  private enrichDetail(v: Prisma.VenueGetPayload<{ include: typeof venueDetailInclude }>) {
+    const sportMap = new Map<string, { id: string; slug: string; nameVi: string; nameEn: string; icon: string | null; defaultSlotMinutes: number; isActive: boolean }>();
+    let minPrice: number | null = null;
+    for (const court of v.courts) {
+      if (court.sport) sportMap.set(court.sport.id, court.sport);
+      for (const rule of court.priceRules) {
+        const p = Number(rule.pricePerSlot);
+        if (minPrice === null || p < minPrice) minPrice = p;
+      }
+    }
+    const amenities = v.amenities.map((a) => a.amenity);
+    const { amenities: _a, _count, ...rest } = v;
+    return {
+      ...rest,
+      amenities,
+      sports: Array.from(sportMap.values()),
+      priceFrom: minPrice ?? 0,
+      reviewsCount: _count.reviews,
+    };
+  }
+
+  private orderByFor(sortBy: SearchVenuesDto['sortBy']): Prisma.VenueOrderByWithRelationInput[] {
+    switch (sortBy) {
+      case 'rating':
+        return [{ ratingAvg: 'desc' }, { id: 'asc' }];
+      case 'newest':
+        return [{ createdAt: 'desc' }, { id: 'asc' }];
+      default:
+        return [{ ratingAvg: 'desc' }, { id: 'asc' }];
+    }
+  }
+
   private async uniqueSlug(name: string): Promise<string> {
     const base = name
       .toLowerCase()
@@ -154,4 +256,15 @@ export class VenuesService {
     }
     return slug;
   }
+}
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
 }

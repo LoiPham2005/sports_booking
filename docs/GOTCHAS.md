@@ -6,7 +6,7 @@
 
 Lúc đầu copy template `flutter_base` rồi xoá `features/`. Nhưng template còn lệ thuộc rất nặng vào `core/` (injectable DI, codegen) → sửa hoài không hết lỗi.
 
-**Giải pháp đã làm**: **Strip toàn bộ** `lib/core/`, `lib/modules/`, `lib/config/`, `lib/routes/`, `lib/design/`, `lib/gen/`, `firebase_options.dart` + tất cả flavor files. Chỉ giữ Flutter scaffolding (android/ios/web/macos). Pubspec tinh gọn — chỉ `go_router`, `google_fonts`, `cached_network_image`, `qr_flutter`, `intl`. **Không dùng codegen, không Riverpod, không Bloc** (cho UI demo).
+**Giải pháp đã làm**: **Strip toàn bộ** `lib/core/`, `lib/modules/`, `lib/config/`, `lib/routes/`, `lib/design/`, `lib/gen/`, `firebase_options.dart` + tất cả flavor files. Chỉ giữ Flutter scaffolding (android/ios/web/macos). Pubspec tinh gọn — chỉ `go_router`, `google_fonts`, `cached_network_image`, `qr_flutter`, `intl`, `flutter_map`, `latlong2`. **Không dùng codegen, không Riverpod, không Bloc** (cho UI demo).
 
 → Nếu cần thêm pattern state phức tạp sau này, add Riverpod riêng. Đừng resurrect flutter_base infrastructure.
 

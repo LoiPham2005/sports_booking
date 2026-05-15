@@ -8,16 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { VENUES, SPORTS, AMENITIES, SURFACES, COURTS } from '@/lib/mock-data';
+import { AMENITIES } from '@/lib/mock-data';
+import { getVenue, listSports } from '@/lib/data/venues';
 import { BookingMatrix } from '@/components/booking/booking-matrix';
-import { formatVND } from '@/lib/format';
 
-export default function VenueDetailPage({ params }: { params: { id: string } }) {
-  const venue = VENUES.find((v) => v.id === params.id);
+export default async function VenueDetailPage({ params }: { params: { id: string } }) {
+  const [venue, sports] = await Promise.all([getVenue(params.id), listSports()]);
   if (!venue) notFound();
 
   const sportNames = venue.sports
-    .map((s) => SPORTS.find((sp) => sp.slug === s)?.name)
+    .map((s) => sports.find((sp) => sp.slug === s)?.name)
     .filter(Boolean) as string[];
 
   return (
@@ -68,7 +68,9 @@ export default function VenueDetailPage({ params }: { params: { id: string } }) 
         {/* Gallery */}
         <div className="mt-5 grid h-[420px] grid-cols-4 grid-rows-2 gap-2 overflow-hidden rounded-2xl">
           <div className="relative col-span-2 row-span-2">
-            <Image src={venue.image} alt={venue.name} fill className="object-cover" priority />
+            {venue.image && (
+              <Image src={venue.image} alt={venue.name} fill className="object-cover" priority />
+            )}
           </div>
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="relative">
@@ -114,10 +116,8 @@ export default function VenueDetailPage({ params }: { params: { id: string } }) 
                 <section>
                   <h2 className="text-lg font-bold">Giới thiệu</h2>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    {venue.name} là một trong những điểm đến hàng đầu cho những người yêu thích thể
-                    thao tại {venue.district}. Với hệ thống sân hiện đại, thiết kế chuẩn quốc tế và
-                    đội ngũ nhân viên thân thiện, chúng tôi mang đến trải nghiệm chơi thể thao tốt
-                    nhất cho bạn và bạn bè.
+                    {venue.description ??
+                      `${venue.name} là một trong những điểm đến hàng đầu cho những người yêu thích thể thao tại ${venue.district}. Với hệ thống sân hiện đại, thiết kế chuẩn quốc tế và đội ngũ nhân viên thân thiện, chúng tôi mang đến trải nghiệm chơi thể thao tốt nhất cho bạn và bạn bè.`}
                   </p>
                 </section>
 
@@ -158,7 +158,8 @@ export default function VenueDetailPage({ params }: { params: { id: string } }) 
                     <li className="flex gap-3">
                       <Phone className="h-5 w-5 shrink-0 text-primary" />
                       <span>
-                        <span className="font-semibold">Hotline</span>: 0901 234 567 (08:00 – 21:00)
+                        <span className="font-semibold">Hotline</span>:{' '}
+                        {venue.phone ?? '0901 234 567'} (08:00 – 21:00)
                       </span>
                     </li>
                   </ul>
@@ -166,7 +167,7 @@ export default function VenueDetailPage({ params }: { params: { id: string } }) 
               </TabsContent>
 
               <TabsContent value="courts" className="space-y-3">
-                {COURTS.map((c) => (
+                {venue.courts.map((c) => (
                   <div
                     key={c.id}
                     className="flex items-center justify-between rounded-lg border bg-card p-4"
@@ -174,12 +175,12 @@ export default function VenueDetailPage({ params }: { params: { id: string } }) 
                     <div>
                       <h4 className="font-semibold">{c.name}</h4>
                       <p className="text-sm text-muted-foreground">
-                        {SURFACES[c.surface]} · {c.indoor ? 'Trong nhà' : 'Ngoài trời'} · {c.capacity} người
+                        {c.surface} · {c.indoor ? 'Trong nhà' : 'Ngoài trời'} · {c.capacity} người
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-base font-bold text-primary">{formatVND(c.pricePerHour)}</p>
-                      <p className="text-xs text-muted-foreground">mỗi giờ</p>
+                      <p className="text-base font-bold text-primary">Xem giá theo giờ</p>
+                      <p className="text-xs text-muted-foreground">trong bảng đặt sân</p>
                     </div>
                   </div>
                 ))}

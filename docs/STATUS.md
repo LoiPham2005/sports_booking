@@ -9,7 +9,7 @@
 | Backend NestJS | 100% (UI-ready API) | Test, deploy, ENV thật |
 | Frontend Next.js | 100% (UI mock) | Nối API |
 | Mobile Flutter | 100% (UI mock) | Nối API |
-| Backend ↔ Client integration | 0% | Cả 2 phía |
+| Backend ↔ Client integration | ✅ **100% — All 7 phases done** | Mobile API integration (sau roadmap) |
 
 ## Backend (NestJS)
 
@@ -113,9 +113,230 @@
 
 ## Tích hợp / Backend connection
 
-❌ Chưa làm gì cả. Cả frontend lẫn mobile đều chạy 100% mock data.
+### ✅ Phase 0 — Foundation (đã xong)
 
-> 📋 **Trước khi bắt đầu nối**: Đọc [API_INTEGRATION.md](API_INTEGRATION.md) — mapping field-by-field UI ↔ DB + checklist đầy đủ. Có drift được liệt kê (BookingStatus 5↔9, Court không có `pricePerHour` trong DB, VenueMember thiếu `inviteStatus/joinedAt`, single `image` vs `VenueImage[]`...).
+**Backend** (`backend/src/`):
+- `common/interceptors/decimal-serializer.interceptor.ts` — convert `Decimal` → `number` recursive cho mọi response, registered globally trong `main.ts`
+- `main.ts` CORS update — reflect origin trong dev, allow credentials, expose headers `Content-Type / Authorization / Idempotency-Key`
+- `modules/auth/auth.controller.ts` — login/register/refresh/logout/google-callback đều set/clear cookie `sb_access` (15') + `sb_refresh` (30d), `httpOnly + sameSite`
+- `modules/auth/strategies/jwt.strategy.ts` — extract JWT từ Authorization header HOẶC cookie `sb_access` (cho Next.js web)
+- `modules/auth/auth.service.ts` — export `AuthResult` interface
+- `.env.example` — thêm `CORS_ORIGINS=http://localhost:3001`
+
+**Frontend** (`frontend/`):
+- `lib/api/config.ts` — `API_BASE`, `USE_MOCK`, cookie names
+- `lib/api/errors.ts` — `ApiError` class (RFC 7807 style)
+- `lib/api/types.ts` — DTO types mirror Prisma schema (enums + entities)
+- `lib/api/client.ts` — fetch wrapper với auto-refresh trên 401, timeout 15s, idempotency key, server-side cookie passthrough
+- `lib/api/adapters/{status,venue,booking,user}.ts` — map DTO → UI types
+- `lib/api/endpoints/{auth,sports}.ts` — typed endpoint helpers (Phase 0 chỉ làm 2 endpoint cơ bản để smoke test)
+- `middleware.ts` — decode JWT từ cookie, redirect `/login` khi chưa auth, redirect home khi sai role
+- `.env.local.example` — `NEXT_PUBLIC_API_BASE` + `NEXT_PUBLIC_USE_MOCK`
+
+### 🧪 Cách test Phase 0
+
+```bash
+# Terminal 1 — backend
+cd backend
+docker compose up -d
+cp .env.example .env
+npm install
+npx prisma migrate dev
+npm run prisma:seed
+npm run start:dev
+
+# Terminal 2 — smoke test cookie + Decimal
+curl -i -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"identifier":"admin@sportsbooking.local","password":"admin@1234"}'
+# → response phải có Set-Cookie: sb_access=...; HttpOnly, sb_refresh=...
+# → JSON body có total/amount là number không phải string
+
+# Terminal 3 — frontend
+cd frontend
+cp .env.local.example .env.local
+# sửa NEXT_PUBLIC_USE_MOCK=false để test API thật
+npm install
+npm run dev
+# → mở localhost:3001, /login đang dùng mock chip (chưa nối API ở UI — Phase 1)
+```
+
+### ✅ Phase 1 — Auth + Customer Read (đã xong)
+
+**Backend** (`backend/src/modules/`):
+- `venues/venues.service.ts` — enhance `search()` + `detail()`: denormalize `sports[]`, `priceFrom` (MIN PriceRule), `amenities[]` flat, `distance` (Haversine khi có lat/lng), nested `images/courts/reviews/hours` cho detail. Hỗ trợ tra cứu bằng `id` cuid hoặc `slug`
+- `venues/dto/venue.dto.ts` — thêm `sortBy: rating | newest`
+- `sports/sports.service.ts` — `list()` aggregate `count` (số venue APPROVED có court của môn) qua `$queryRaw` GROUP BY
+
+**Frontend** (`frontend/`):
+- `lib/api/endpoints/venues.ts` — `venuesApi.list()`, `venuesApi.detail()` trả `UiVenue` / `UiVenueDetail` đã adapter
+- `lib/data/venues.ts` — wrapper chọn mock vs API qua `USE_MOCK`, dùng được ở server component
+- `app/(auth)/login/page.tsx` — convert thành client component + form submit qua `authApi.login`, redirect theo role, demo chip 5 role chỉ hiện khi `USE_MOCK=true`
+- `app/(auth)/register/page.tsx` — wire `authApi.register`, validate fullName + email/phone + password ≥8 + agree terms
+- `app/(auth)/forgot-password/page.tsx` — 2-step: request OTP → reset password
+- `app/page.tsx` — async server component fetch `listSports()` + `listVenues({ limit: 6, sortBy: 'rating' })`
+- `app/(public)/venues/page.tsx` — client component với filter sport/q/sortBy reactive, debounce search 300ms, loading skeleton, empty state
+- `app/(public)/venues/[id]/page.tsx` — async server component fetch `getVenue(id-or-slug)`, hiển thị courts thật + amenities + description
+- `app/layout.tsx` — mount `<Toaster>` (sonner) ở root
+
+### 🧪 Test Phase 1
+
+```bash
+# 1. Backend (cần Docker + Postgres + Redis chạy):
+cd backend
+docker compose up -d
+npm run prisma:migrate
+npm run prisma:seed
+npm run start:dev
+
+# 2. Frontend với mock (giữ UI cũ):
+cd frontend
+cp .env.local.example .env.local
+# NEXT_PUBLIC_USE_MOCK=true  → mock như cũ, login 5 chip
+npm run dev
+
+# 3. Frontend với API thật:
+# Sửa .env.local: NEXT_PUBLIC_USE_MOCK=false
+# - /login → form gọi POST /auth/login, redirect theo role
+# - / + /venues + /venues/[id] → fetch từ /api/v1/venues
+# - 5 demo chip biến mất, middleware chặn /owner /admin khi chưa login
+```
+
+### ✅ Phase 2 — Booking + Payment (đã xong code)
+
+**Backend** — verify đã có đủ:
+- `POST /bookings/quote` (hold 10' Redis + price)
+- `POST /bookings` (create từ holdToken)
+- `POST /payments` (return redirectUrl/qrData)
+- `GET /payments/:id` (poll status)
+- `POST /bookings/:id/cancel` (refund auto theo cancel policy)
+- `payments.controller.ts` — đổi redirect sau IPN từ `/payments/result` → `/booking/result` để khớp UI
+
+**Frontend** (`frontend/`):
+- `lib/api/endpoints/bookings.ts` — `quote`, `create`, `detail`, `mine`, `cancel`
+- `lib/api/endpoints/payments.ts` — `create`, `detail` (poll)
+- `lib/api/endpoints/pricing.ts` — `quote` (preview giá, không hold)
+- `lib/data/bookings.ts` — wrapper mock/API cho `listMyBookings`, `getMyBooking`, `cancelBooking`
+- `app/booking/new/page.tsx` — refactor full: client component, parse URL `?venue=&date=&slots=courtId:HH:MM,HH:MM`, on-mount gọi `bookingsApi.quote()` để hold + lấy price + token, **hold timer countdown 10' live**, auto redirect khi hết giờ, step 1 review + notes, step 2 chọn provider → `bookingsApi.create()` → `paymentsApi.create()` → redirect `redirectUrl` (VNPay/MoMo) hoặc đi `/booking/result?paymentId=...` (ZaloPay/poll)
+- `app/booking/result/page.tsx` — 4 state (loading/pending/success/fail): mock fallback, parse `?code=&status=` từ backend redirect, **poll `paymentsApi.detail(id)` mỗi 3s, max 60s** rồi đi `pending` state với nút "Làm mới"
+- `app/(account)/account/bookings/[id]/page.tsx` — client component fetch `getMyBooking`, hiển thị status + refund + cancelReason, **cancel inline confirm card** với policy 24h/12h, refetch sau cancel
+
+### 🧪 Test Phase 2
+
+```bash
+# Cần ngrok cho webhook (sandbox VNPay/MoMo/ZaloPay):
+ngrok http 3000
+# Update env backend: VNPAY_RETURN_URL=https://xxxx.ngrok.io/api/v1/payments/return/vnpay
+# (tương tự cho MoMo + ZaloPay webhook URLs)
+
+# Smoke test trên localhost:
+# 1. Login → /venues/[id] chọn slot trên matrix → click "Tiếp tục thanh toán"
+# 2. /booking/new tự gọi quote → countdown 10:00 hiện trên header
+# 3. Chọn VNPay → "Thanh toán X" → redirect vnpayment.vn sandbox
+# 4. Hoàn tất sandbox → backend nhận IPN → set Booking.status = CONFIRMED
+# 5. Backend redirect về /booking/result?provider=vnpay&orderId=&code=00
+# 6. UI nhận code=00 → render success ngay
+# 7. /account/bookings/[id] → "Huỷ booking" → confirm card → API call cancel → refresh
+```
+
+### ✅ Phase 3 — Customer Account (đã xong)
+
+**Backend** — verify đã có đủ endpoints (`/me/*` + `/bookings/mine`):
+- `GET /me`, `PATCH /me` (profile)
+- `GET /me/favorites`, `POST/DELETE /me/favorites/:venueId`
+- `GET /me/notifications`, `POST /me/notifications/:id/read`
+- `GET /bookings/mine` (đã có từ Phase 2)
+
+**Frontend** (`frontend/`):
+- `lib/api/endpoints/users.ts` — `me`, `updateMe`, `favorites`, `addFavorite`, `removeFavorite`
+- `lib/api/endpoints/notifications.ts` — `list`, `markRead` + `UiNotification` type + `toUiNotification` adapter
+- `lib/data/users.ts` — wrapper mock/API cho profile + favorites + notifications, có mock state in-memory cho toggle favorite + mark read khi `USE_MOCK=true`
+- `app/(account)/account/bookings/page.tsx` — client component fetch `listMyBookings`, group 3 tab (Sắp tới/Hoàn thành/Đã huỷ), gom `CANCELLED + NO_SHOW + REFUNDED` thành tab "Đã huỷ"
+- `app/(account)/account/favorites/page.tsx` — client component fetch `listFavorites`, nút heart inline để bỏ favorite + optimistic update + empty state
+- `app/(account)/account/profile/page.tsx` — fetch `getMe`, form patch `fullName + dob` (email/phone read-only — cần admin đổi), avatar fallback initials
+- `app/(account)/account/notifications/page.tsx` — fetch `listNotifications`, click 1 item tự mark read (optimistic), nút "Đánh dấu đọc hết" gọi `Promise.all`, format thời gian tương đối (phút/giờ/ngày)
+
+### 🧪 Test Phase 3
+
+```bash
+# Backend cần seed user demo (admin@sportsbooking.local hoặc tạo customer mới qua /auth/register)
+# Frontend NEXT_PUBLIC_USE_MOCK=false → login với customer → vào /account/*
+```
+
+### ✅ Phase 4 — Owner (đã xong)
+
+**Backend schema migration** (`prisma/schema.prisma` — chạy `npx prisma migrate dev --name phase4_owner`):
+- `VenueMember`: thêm `email`, `inviteStatus` (enum `VenueMemberStatus`: PENDING/ACTIVE/SUSPENDED/REMOVED), `inviteToken`, `inviteExpiresAt`, `createdAt`, `acceptedAt`. `userId` đổi sang nullable (cho invite trước khi user accept)
+- `Booking`: thêm `handledByUserId`, `refusedAt`, `refuseReason`
+
+**Backend module mới** (`src/modules/owner/`):
+- `owner.service.ts` — dashboard (KPI tổng aggregate revenue/occupancy/top customers + revenue 7 ngày qua `$queryRaw`), submit venue, list bookings, **walk-in** (CONFIRMED + source=WALK_IN), **refuse** (chỉ trong 5' sau tạo, CANCELLED_BY_OWNER + refund 100%), staff list/invite/update/remove, **acceptInvite**, reports (group by day/week/month + payment breakdown), payout summary + request (tạo Payout đè vào OwnerEarning pending)
+- `owner.controller.ts` — `@Roles(OWNER, ADMIN, SUPER_ADMIN)` + `StaffInviteController` cho accept link
+- `owner.module.ts` đăng ký vào `app.module.ts`
+
+**Frontend** (`frontend/`):
+- `lib/api/endpoints/owner.ts` — types đầy đủ + `ownerApi` (dashboard, bookings, walkIn, refuseBooking, listVenues, staff, inviteStaff, updateStaff, removeStaff, reports, payoutSummary, requestPayout, submitVenue)
+- `lib/data/owner.ts` — wrapper mock/API cho mọi hàm, có in-memory state cho staff invite/remove khi mock
+- `app/(owner)/owner/page.tsx` — dashboard với 4 KPI + revenue chart 7 ngày + top customers + recent bookings (server data, fallback mock)
+- `app/(owner)/owner/venues/page.tsx` — list owned venues
+- `app/(owner)/owner/bookings/page.tsx` — **danh sách booking theo ngày** (đơn giản hơn calendar grid để Phase 4.5 polish), filter venue, nút "Từ chối" inline (gọi `refuseBooking` — backend enforce 5' window)
+- `app/(owner)/owner/walk-in/page.tsx` — form đầy đủ: chọn venue/court/date/slots/hourlyRate, hiển thị customer info optional, tự tính range startsAt/endsAt từ slots, gọi `createWalkIn`
+- `app/(owner)/owner/reports/page.tsx` — chart series theo bucket + payment breakdown bar, switch groupBy (day/week/month)
+- `app/(owner)/owner/payout/page.tsx` — pending balance card với gradient + bank account + history + nút "Yêu cầu chuyển ngay" gọi `requestPayout`
+- `app/(owner)/owner/staff/page.tsx` — table staff với invite modal inline (email + role + venue), suspend/unsuspend toggle, remove confirm, search filter, status badge
+
+### 🧪 Test Phase 4
+
+```bash
+# 1. Migrate schema:
+cd backend
+npx prisma migrate dev --name phase4_owner
+
+# 2. Đăng nhập với role OWNER:
+# Seed file đã có owner@sportsbooking.local / owner@1234
+# Hoặc /admin/users → promote 1 user lên OWNER role
+
+# 3. Vào /owner — verify dashboard load + KPI hiện tại
+# 4. /owner/walk-in → tạo booking thử
+# 5. /owner/staff → invite test@email.com role STAFF
+```
+
+### ✅ Phase 5 — Staff + Manager (đã xong)
+
+**Backend module mới** (`src/modules/staff/`):
+- `staff.service.ts` — auto-scope theo `VenueMember.userId + inviteStatus=ACTIVE`, không dùng `@Roles()` decorator. Manager-only endpoints có `assertManager` check `role=MANAGER` cho venueId cụ thể.
+  - `memberships()`, `today()`, `schedule()`, `checkIn()`, `revenue()`, `team()`, `listOverrides()`, `createOverride()`, `deleteOverride()`, `acceptInvite()`
+  - `revenue()`: aggregate doanh thu hôm nay + byHour (`EXTRACT(hour)`) + byCourt (GROUP BY)
+  - `checkIn()`: chấp nhận cả `checkInToken` lẫn `code`, set `status=CHECKED_IN + checkedInAt + handledByUserId`
+- `staff.controller.ts` — 9 routes:
+  - `GET /staff/memberships`, `GET /staff/today`, `GET /staff/schedule`, `POST /staff/check-in`
+  - Manager: `GET /staff/revenue`, `GET /staff/team`, `GET/POST/DELETE /staff/pricing/overrides`
+- Registered trong `app.module.ts`
+
+**Frontend**:
+- `lib/api/endpoints/staff.ts` — types đầy đủ + `staffApi` (memberships, today, schedule, checkIn, revenue, team, listOverrides, createOverride, deleteOverride)
+- `lib/data/staff.ts` — wrapper mock/API cho mọi hàm, in-memory state cho overrides + memberships khi mock
+- `lib/use-staff-role.ts` — **refactor**: vẫn đọc `?role=manager` URL khi `USE_MOCK=true`, **fetch `getMyMemberships()` rồi check `MANAGER` role** khi `USE_MOCK=false`. `withRole()` chỉ no-op khi không mock.
+- `app/(staff)/staff/page.tsx` — Today: fetch real bookings, **check-in trực tiếp** từ row (gọi `checkInBooking(token)`), revenue card chỉ Manager
+- `app/(staff)/staff/schedule/page.tsx` — date picker + shift ±1 ngày, gọi `getStaffSchedule({ date, days: 1 })`
+- `app/(staff)/staff/bookings/[id]/page.tsx` — fetch real booking via `bookingsApi.detail`, nút Check-in, **đã sửa luôn lỗi `Sticky` → `StickyNote`** (lucide-react)
+- `app/(staff)/staff/revenue/page.tsx` — hourly bar chart từ `getRevenue().byHour`, court distribution từ `byCourt`
+- `app/(staff)/staff/team/page.tsx` — fetch real team từ `getTeam()`, view-only (Owner mới CRUD)
+- `app/(staff)/staff/pricing/page.tsx` — **list + create + delete overrides**: form 6 field (courtId/date/start/end/price/reason), call `createOverride()`, optimistic delete
+
+### 🧪 Test Phase 5
+
+```bash
+# 1. Cần data: 1 user là VenueMember role MANAGER + 1 user role STAFF (Owner invite từ Phase 4 → user accept invite)
+# 2. Đăng nhập user STAFF → vào /staff
+# 3. Booking CONFIRMED → click "Check-in" → status đổi sang CHECKED_IN
+# 4. Đăng nhập user MANAGER → /staff/revenue + /staff/team + /staff/pricing có data
+# 5. STAFF (không phải MANAGER) → vào /staff/revenue → AccessDenied + 403 từ backend
+```
+
+> 📋 **Trước khi bắt đầu nối**:
+> - Đọc [API_INTEGRATION.md](API_INTEGRATION.md) — mapping field-by-field UI ↔ DB + checklist
+> - Đọc [API_INTEGRATION_PLAN.md](API_INTEGRATION_PLAN.md) — roadmap 8 phase, thứ tự role, backend gaps, timeline ~38 ngày
 
 ### Khi sẵn sàng nối API
 

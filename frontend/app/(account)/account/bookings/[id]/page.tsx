@@ -1,16 +1,80 @@
+'use client';
+
 import Link from 'next/link';
-import Image from 'next/image';
-import { notFound } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, Calendar, MapPin, QrCode, Phone, Star } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BOOKINGS, STATUS_LABEL } from '@/lib/mock-data';
+import { STATUS_LABEL } from '@/lib/api/adapters/status';
 import { formatDateLong, formatTime, formatVND } from '@/lib/format';
+import { getMyBooking, cancelBooking } from '@/lib/data/bookings';
+import { isApiError } from '@/lib/api/errors';
+import type { UiBooking } from '@/lib/api/adapters/booking';
 
 export default function BookingDetailPage({ params }: { params: { id: string } }) {
-  const b = BOOKINGS.find((x) => x.id === params.id);
-  if (!b) notFound();
+  const router = useRouter();
+  const [b, setBooking] = useState<UiBooking | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const x = await getMyBooking(params.id);
+      if (cancelled) return;
+      setBooking(x);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id]);
+
+  async function handleCancel() {
+    if (!b) return;
+    setCancelling(true);
+    try {
+      await cancelBooking(b.id);
+      toast.success('Đã huỷ booking');
+      setConfirmOpen(false);
+      // Refetch để cập nhật status + refund amount
+      const updated = await getMyBooking(b.id);
+      setBooking(updated);
+      router.refresh();
+    } catch (e) {
+      const msg = isApiError(e) ? e.message : 'Huỷ booking thất bại';
+      toast.error(msg);
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-40 animate-pulse rounded-xl border bg-muted/30" />
+        <div className="h-60 animate-pulse rounded-xl border bg-muted/30" />
+      </div>
+    );
+  }
+
+  if (!b) {
+    return (
+      <div className="space-y-4 rounded-xl border bg-card p-8 text-center">
+        <p className="text-base font-semibold">Không tìm thấy booking</p>
+        <Button asChild variant="outline">
+          <Link href="/account/bookings">Về danh sách</Link>
+        </Button>
+      </div>
+    );
+  }
+
   const status = STATUS_LABEL[b.status];
+  const isUpcoming = b.status === 'CONFIRMED' || b.status === 'PENDING_PAYMENT';
+  const canCancel = isUpcoming;
 
   return (
     <div className="space-y-6">
@@ -31,19 +95,25 @@ export default function BookingDetailPage({ params }: { params: { id: string } }
         </div>
 
         <div className="flex flex-col gap-5 p-6 md:flex-row">
-          <div className="relative h-40 w-full shrink-0 overflow-hidden rounded-lg md:h-32 md:w-48">
-            <Image src={b.venue.image} alt={b.venue.name} fill className="object-cover" />
-          </div>
+          {b.venue.image && (
+            <div className="relative h-40 w-full shrink-0 overflow-hidden rounded-lg md:h-32 md:w-48">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={b.venue.image} alt={b.venue.name} className="h-full w-full object-cover" />
+            </div>
+          )}
           <div className="flex-1">
             <h2 className="text-xl font-bold">{b.venue.name}</h2>
             <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" /> {b.venue.address}, {b.venue.district}, {b.venue.city}
+              <MapPin className="h-3.5 w-3.5" /> {b.venue.address}, {b.venue.district},{' '}
+              {b.venue.city}
             </p>
-            <Button asChild variant="link" className="mt-1 h-auto p-0">
-              <a href="tel:0901234567">
-                <Phone className="h-3.5 w-3.5" /> 0901 234 567
-              </a>
-            </Button>
+            {b.venue.phone && (
+              <Button asChild variant="link" className="mt-1 h-auto p-0">
+                <a href={`tel:${b.venue.phone.replace(/\s/g, '')}`}>
+                  <Phone className="h-3.5 w-3.5" /> {b.venue.phone}
+                </a>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -54,13 +124,14 @@ export default function BookingDetailPage({ params }: { params: { id: string } }
               {formatTime(b.startsAt)} – {formatTime(b.endsAt)}
             </span>
           </InfoTile>
-          <InfoTile label="Sân">
-            {b.courtName}
-            <span className="block text-xs text-muted-foreground">Cỏ nhân tạo · 10 người</span>
-          </InfoTile>
+          <InfoTile label="Sân">{b.courtName}</InfoTile>
           <InfoTile label="Tổng tiền" highlight>
             {formatVND(b.total)}
-            <span className="block text-xs font-normal text-muted-foreground">Đã thanh toán qua VNPay</span>
+            {b.refundAmount != null && b.refundAmount > 0 && (
+              <span className="block text-xs font-normal text-success">
+                Đã hoàn {formatVND(b.refundAmount)}
+              </span>
+            )}
           </InfoTile>
         </div>
       </div>
@@ -76,6 +147,11 @@ export default function BookingDetailPage({ params }: { params: { id: string } }
               Đưa mã này cho nhân viên tại sân để check-in. Mã chỉ dùng được 1 lần và sẽ hết hạn sau
               giờ chơi.
             </p>
+            {b.checkInToken && (
+              <p className="mt-2 text-xs font-mono text-muted-foreground">
+                Token: {b.checkInToken.slice(0, 8)}...
+              </p>
+            )}
             <div className="mt-4 flex gap-2">
               <Button variant="outline">Tải mã QR</Button>
               <Button variant="ghost">Gửi tới email</Button>
@@ -84,29 +160,12 @@ export default function BookingDetailPage({ params }: { params: { id: string } }
         </div>
       )}
 
-      <div className="rounded-xl border bg-card p-6">
-        <h3 className="text-lg font-bold">Lịch sử trạng thái</h3>
-        <ol className="mt-4 space-y-3">
-          {[
-            { time: '12:30', label: 'Tạo booking', done: true },
-            { time: '12:32', label: 'Thanh toán thành công qua VNPay', done: true },
-            { time: '—', label: 'Đã đặt giờ, đợi check-in', done: false, current: true },
-            { time: '—', label: 'Hoàn thành', done: false },
-          ].map((s, i) => (
-            <li key={i} className="flex items-start gap-3">
-              <div
-                className={`mt-0.5 h-3 w-3 rounded-full ${
-                  s.done ? 'bg-success' : s.current ? 'bg-primary ring-4 ring-primary/20' : 'bg-muted'
-                }`}
-              />
-              <div className="flex-1">
-                <p className="text-sm font-medium">{s.label}</p>
-              </div>
-              <span className="text-xs text-muted-foreground">{s.time}</span>
-            </li>
-          ))}
-        </ol>
-      </div>
+      {b.cancelReason && (
+        <div className="rounded-xl border bg-destructive/5 p-4 text-sm">
+          <p className="font-semibold text-destructive">Lý do huỷ</p>
+          <p className="mt-1 text-muted-foreground">{b.cancelReason}</p>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3">
         {b.status === 'COMPLETED' && (
@@ -114,9 +173,28 @@ export default function BookingDetailPage({ params }: { params: { id: string } }
             <Star className="h-4 w-4" /> Đánh giá sân
           </Button>
         )}
-        {(b.status === 'PENDING_PAYMENT' || b.status === 'CONFIRMED') && (
-          <Button variant="destructive">Huỷ booking</Button>
-        )}
+        {canCancel &&
+          (confirmOpen ? (
+            <div className="flex w-full flex-wrap items-center gap-3 rounded-xl border bg-destructive/5 p-4">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-destructive">Xác nhận huỷ booking?</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Hoàn tiền theo chính sách: trước 24h hoàn 100%, 12-24h hoàn 50%, dưới 12h không
+                  hoàn.
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={cancelling}>
+                Đóng
+              </Button>
+              <Button variant="destructive" onClick={handleCancel} disabled={cancelling}>
+                {cancelling ? 'Đang huỷ...' : 'Huỷ booking'}
+              </Button>
+            </div>
+          ) : (
+            <Button variant="destructive" onClick={() => setConfirmOpen(true)}>
+              Huỷ booking
+            </Button>
+          ))}
         <Button variant="outline">Tải hoá đơn</Button>
       </div>
     </div>
@@ -140,7 +218,9 @@ function InfoTile({
         {icon}
         {label}
       </div>
-      <div className={`mt-1 ${highlight ? 'text-xl font-bold text-primary' : 'text-base font-semibold'}`}>
+      <div
+        className={`mt-1 ${highlight ? 'text-xl font-bold text-primary' : 'text-base font-semibold'}`}
+      >
         {children}
       </div>
     </div>

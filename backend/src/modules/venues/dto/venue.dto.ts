@@ -22,6 +22,10 @@ export class SearchVenuesDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Type(() => Number) @Min(0) @Max(50) radiusKm?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() cursor?: string;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @Min(1) @Max(50) limit?: number = 20;
+  @ApiPropertyOptional({ enum: ['rating', 'newest'] })
+  @IsOptional()
+  @IsString()
+  sortBy?: 'rating' | 'newest';
 }
 
 export class CreateVenueDto {

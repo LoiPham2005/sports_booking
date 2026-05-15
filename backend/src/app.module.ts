@@ -23,6 +23,11 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { OwnerModule } from './modules/owner/owner.module';
+import { StaffModule } from './modules/staff/staff.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { VouchersModule } from './modules/vouchers/vouchers.module';
+import { SystemModule } from './modules/system/system.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -58,6 +63,11 @@ import { RolesGuard } from './common/guards/roles.guard';
     ReviewsModule,
     NotificationsModule,
     UploadsModule,
+    OwnerModule,
+    StaffModule,
+    AdminModule,
+    VouchersModule,
+    SystemModule,
   ],
   controllers: [HealthController],
   providers: [

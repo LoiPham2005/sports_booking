@@ -89,7 +89,7 @@ export class PaymentsController {
     const result = await this.payments.handleCallback(PaymentProviderEnum.VNPAY, query, {});
     const web = this.cfg.get<string>('app.webUrl');
     res.redirect(
-      `${web}/payments/result?provider=vnpay&orderId=${query.vnp_TxnRef}&code=${query.vnp_ResponseCode}`,
+      `${web}/booking/result?provider=vnpay&orderId=${query.vnp_TxnRef}&code=${query.vnp_ResponseCode}`,
     );
   }
 
@@ -98,7 +98,7 @@ export class PaymentsController {
   momoReturn(@Query() query: any, @Res() res: Response) {
     const web = this.cfg.get<string>('app.webUrl');
     res.redirect(
-      `${web}/payments/result?provider=momo&orderId=${query.orderId}&code=${query.resultCode}`,
+      `${web}/booking/result?provider=momo&orderId=${query.orderId}&code=${query.resultCode}`,
     );
   }
 
@@ -107,7 +107,7 @@ export class PaymentsController {
   zalopayReturn(@Query() query: any, @Res() res: Response) {
     const web = this.cfg.get<string>('app.webUrl');
     res.redirect(
-      `${web}/payments/result?provider=zalopay&orderId=${query.apptransid}&status=${query.status}`,
+      `${web}/booking/result?provider=zalopay&orderId=${query.apptransid}&status=${query.status}`,
     );
   }
 

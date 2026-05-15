@@ -8,6 +8,7 @@ import cookieParser from 'cookie-parser';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { DecimalSerializerInterceptor } from './common/interceptors/decimal-serializer.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -19,9 +20,18 @@ async function bootstrap() {
 
   app.use(helmet());
   app.use(cookieParser());
+
+  // CORS: nếu corsOrigins là ['*'] → reflect origin (cookie cross-site cần origin cụ thể).
+  // Dev: WEB_URL=http://localhost:3001 + MOBILE_URL=... Prod: list domain thật.
+  const corsOrigins = config.get<string[]>('app.corsOrigins', ['*']);
+  const allowAll = corsOrigins.length === 1 && corsOrigins[0] === '*';
   app.enableCors({
-    origin: config.get<string[]>('app.corsOrigins', ['*']),
+    origin: allowAll
+      ? (origin, cb) => cb(null, origin ?? true)
+      : corsOrigins,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
   });
   app.setGlobalPrefix('api', { exclude: ['health', 'health/(.*)'] });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
@@ -35,6 +45,7 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalInterceptors(new DecimalSerializerInterceptor());
 
   if (env !== 'production') {
     const docConfig = new DocumentBuilder()
