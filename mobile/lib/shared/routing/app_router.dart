@@ -17,6 +17,7 @@ import '../../features/owner/owner_payout_page.dart';
 import '../../features/owner/owner_qr_scan_page.dart';
 import '../../features/owner/owner_reports_page.dart';
 import '../../features/owner/owner_shell.dart';
+import '../../features/owner/owner_venue_create_page.dart';
 import '../../features/owner/owner_venue_edit_page.dart';
 import '../../features/owner/owner_walk_in_page.dart';
 import '../../features/splash/onboarding_page.dart';
@@ -69,6 +70,10 @@ final appRouter = GoRouter(
     GoRoute(path: RoutePaths.ownerWalkIn, builder: (_, __) => const OwnerWalkInPage()),
     GoRoute(path: RoutePaths.ownerPayout, builder: (_, __) => const OwnerPayoutPage()),
     GoRoute(path: RoutePaths.ownerReports, builder: (_, __) => const OwnerReportsPage()),
+    GoRoute(
+      path: RoutePaths.ownerVenueCreate,
+      builder: (_, __) => const OwnerVenueCreatePage(),
+    ),
     GoRoute(
       path: RoutePaths.ownerVenueEditParam,
       builder: (_, state) => OwnerVenueEditPage(id: state.pathParameters['id']!),

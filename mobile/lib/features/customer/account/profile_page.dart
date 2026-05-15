@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../shared/routing/safe_pop.dart';
 
 import '../../../shared/theme/app_colors.dart';
 
@@ -12,7 +13,7 @@ class ProfilePage extends StatelessWidget {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () => safePop(context),
         ),
         title: const Text('Thông tin cá nhân'),
         actions: [TextButton(onPressed: () {}, child: const Text('Lưu'))],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../shared/routing/safe_pop.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../shared/mock/mock_data.dart';
@@ -22,7 +23,7 @@ class BookingDetailPage extends StatelessWidget {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () => safePop(context),
         ),
         title: const Text('Chi tiết booking'),
         actions: [

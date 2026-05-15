@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared/routing/route_paths.dart';
+import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -95,7 +96,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text('Đã có tài khoản? ', style: TextStyle(color: AppColors.textSecondary)),
-                    TextButton(onPressed: () => context.pop(), child: const Text('Đăng nhập')),
+                    TextButton(onPressed: () => safePop(context), child: const Text('Đăng nhập')),
                   ],
                 ),
               ),

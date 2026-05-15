@@ -23,7 +23,8 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         centerTitle: false,
-        titleTextStyle: AppTextStyles.textTheme(AppColors.textPrimary).titleLarge,
+        titleTextStyle:
+            AppTextStyles.textTheme(AppColors.textPrimary).titleLarge,
       ),
       cardTheme: CardThemeData(
         color: AppColors.background,
@@ -37,9 +38,10 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
-          minimumSize: const Size(64, 52),
+          minimumSize: const Size.fromHeight(52),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
@@ -47,9 +49,10 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
           side: const BorderSide(color: AppColors.border),
-          minimumSize: const Size(64, 52),
+          minimumSize: const Size.fromHeight(52),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
@@ -62,7 +65,8 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.border),
@@ -79,11 +83,13 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.surface,
-        labelStyle: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+        labelStyle: const TextStyle(
+            color: AppColors.textPrimary, fontWeight: FontWeight.w500),
         side: const BorderSide(color: AppColors.border),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      dividerTheme: const DividerThemeData(color: AppColors.border, thickness: 1, space: 1),
+      dividerTheme: const DividerThemeData(
+          color: AppColors.border, thickness: 1, space: 1),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.background,
         selectedItemColor: AppColors.primary,
@@ -113,7 +119,8 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         centerTitle: false,
-        titleTextStyle: AppTextStyles.textTheme(AppColors.textPrimaryDark).titleLarge,
+        titleTextStyle:
+            AppTextStyles.textTheme(AppColors.textPrimaryDark).titleLarge,
       ),
       cardTheme: CardThemeData(
         color: AppColors.surfaceDark,
@@ -127,15 +134,17 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
-          minimumSize: const Size(64, 52),
+          minimumSize: const Size.fromHeight(52),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceAltDark,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.borderDark),

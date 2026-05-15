@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../shared/routing/safe_pop.dart';
 
 import '../../shared/theme/app_colors.dart';
 import '../../shared/widgets/qr_scanner_placeholder.dart';
@@ -24,7 +25,7 @@ class OwnerQrScanPage extends StatelessWidget {
                     shape: const CircleBorder(),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
-                      onTap: () => context.pop(),
+                      onTap: () => safePop(context),
                       child: const SizedBox(
                         height: 40,
                         width: 40,

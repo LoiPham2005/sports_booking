@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../shared/mock/mock_data.dart';
 import '../../../shared/routing/route_paths.dart';
+import '../../../shared/routing/safe_pop.dart';
 import '../../../shared/widgets/venue_card.dart';
 
 class FavoritesPage extends StatelessWidget {
@@ -15,7 +16,7 @@ class FavoritesPage extends StatelessWidget {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () => safePop(context),
         ),
         title: const Text('Sân yêu thích'),
       ),

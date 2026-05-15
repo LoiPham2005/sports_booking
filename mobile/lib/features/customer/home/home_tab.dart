@@ -201,7 +201,13 @@ class HomeTab extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Text('Booking sắp tới', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                              const Flexible(
+                                child: Text(
+                                  'Booking sắp tới',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                ),
+                              ),
                               const SizedBox(width: 8),
                               StatusBadge(status: upcoming.status),
                             ],

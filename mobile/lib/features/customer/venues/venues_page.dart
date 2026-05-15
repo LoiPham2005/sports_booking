@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../shared/mock/mock_data.dart';
 import '../../../shared/routing/route_paths.dart';
+import '../../../shared/routing/safe_pop.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/venue_card.dart';
 
@@ -27,7 +28,7 @@ class _VenuesPageState extends State<VenuesPage> {
               title: const Text('Khám phá sân'),
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.pop(),
+                onPressed: () => safePop(context),
               ),
             ),
       body: SafeArea(

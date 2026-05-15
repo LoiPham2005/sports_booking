@@ -246,9 +246,12 @@ class _BookingCard extends StatelessWidget {
     if (b.status == BookingStatus.pendingPayment ||
         b.status == BookingStatus.confirmed) {
       btns.add(const SizedBox(width: 8));
-      btns.add(OutlinedButton(
-        onPressed: () {},
-        child: const Text('Huỷ'),
+      btns.add(SizedBox(
+        width: 88,
+        child: OutlinedButton(
+          onPressed: () {},
+          child: const Text('Huỷ'),
+        ),
       ));
     }
     return btns;

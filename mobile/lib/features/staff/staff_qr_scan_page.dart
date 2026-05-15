@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../shared/routing/safe_pop.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/theme/app_colors.dart';
@@ -51,7 +52,7 @@ class _StaffQrScanPageState extends State<StaffQrScanPage> {
                     shape: const CircleBorder(),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
-                      onTap: () => context.pop(),
+                      onTap: () => safePop(context),
                       child: const SizedBox(
                         height: 40,
                         width: 40,

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
+import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/status_badge.dart';
@@ -23,7 +24,7 @@ class OwnerBookingDetailPage extends StatelessWidget {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () => safePop(context),
         ),
         title: const Text('Chi tiết booking'),
         actions: [

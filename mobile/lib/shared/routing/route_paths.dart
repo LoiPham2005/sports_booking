@@ -14,6 +14,7 @@ class RoutePaths {
   static const ownerWalkIn = '/owner/walk-in';
   static const ownerPayout = '/owner/payout';
   static const ownerReports = '/owner/reports';
+  static const ownerVenueCreate = '/owner/venues/create';
   static String ownerVenueEdit(String id) => '/owner/venues/$id/edit';
   static const ownerVenueEditParam = '/owner/venues/:id/edit';
   static String ownerBookingDetail(String id) => '/owner/bookings/$id';

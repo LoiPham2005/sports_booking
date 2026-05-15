@@ -14,17 +14,19 @@ class SportChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: 88,
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
           color: Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              height: 48,
-              width: 48,
+              height: 40,
+              width: 40,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -37,9 +39,9 @@ class SportChip extends StatelessWidget {
                 ),
               ),
               alignment: Alignment.center,
-              child: Text(sport.icon, style: const TextStyle(fontSize: 24)),
+              child: Text(sport.icon, style: const TextStyle(fontSize: 20)),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               sport.name,
               maxLines: 1,
@@ -48,7 +50,7 @@ class SportChip extends StatelessWidget {
             ),
             Text(
               '${sport.count} sân',
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
             ),
           ],
         ),

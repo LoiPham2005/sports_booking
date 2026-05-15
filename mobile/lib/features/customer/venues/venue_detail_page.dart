@@ -1,11 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../shared/routing/safe_pop.dart';
 
 import '../../../shared/mock/mock_data.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/utils/format.dart';
-import 'booking_sheet.dart';
+import 'booking_matrix.dart';
 
 class VenueDetailPage extends StatelessWidget {
   final String id;
@@ -428,7 +429,7 @@ class VenueDetailPage extends StatelessWidget {
             left: 8,
             child: _RoundIconBtn(
               icon: Icons.arrow_back,
-              onTap: () => context.pop(),
+              onTap: () => safePop(context),
             ),
           ),
           Positioned(
@@ -457,7 +458,37 @@ class VenueDetailPage extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => BookingSheet(venue: venue),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.95,
+        maxChildSize: 0.97,
+        minChildSize: 0.5,
+        builder: (_, scrollCtrl) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                height: 4,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  child: BookingMatrix(venue: venue),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

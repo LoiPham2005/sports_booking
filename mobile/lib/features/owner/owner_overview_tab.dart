@@ -99,7 +99,7 @@ class OwnerOverviewTab extends StatelessWidget {
             crossAxisCount: 2,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 1.45,
+            childAspectRatio: 1.15,
             children: [
               KpiCard(
                 icon: Icons.account_balance_wallet_outlined,

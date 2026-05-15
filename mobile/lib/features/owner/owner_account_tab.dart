@@ -100,6 +100,47 @@ class OwnerAccountTab extends StatelessWidget {
                 onTap: () => context.push(RoutePaths.ownerVenueEdit(v.id)),
               )),
 
+          // Add new venue tile
+          InkWell(
+            onTap: () => context.push(RoutePaths.ownerVenueCreate),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    height: 36,
+                    width: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.add, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Thêm venue mới',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.primary)),
+                        Text('Mở rộng kinh doanh — Admin duyệt trong 24h',
+                            style: TextStyle(
+                                color: AppColors.textMuted, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios,
+                      size: 14, color: AppColors.primary),
+                ],
+              ),
+            ),
+          ),
+
           const SizedBox(height: 8),
           _Section('Vận hành'),
           _Tile(

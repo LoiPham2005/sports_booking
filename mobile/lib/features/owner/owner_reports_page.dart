@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../shared/routing/safe_pop.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/theme/app_colors.dart';
@@ -23,7 +24,7 @@ class _OwnerReportsPageState extends State<OwnerReportsPage> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () => safePop(context),
         ),
         title: const Text('Báo cáo'),
         actions: [
