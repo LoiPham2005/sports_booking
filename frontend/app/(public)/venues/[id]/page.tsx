@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { VENUES, SPORTS, AMENITIES, SURFACES, COURTS } from '@/lib/mock-data';
-import { BookingWidget } from '@/components/booking/booking-widget';
+import { BookingMatrix } from '@/components/booking/booking-matrix';
 import { formatVND } from '@/lib/format';
 
 export default function VenueDetailPage({ params }: { params: { id: string } }) {
@@ -93,9 +93,13 @@ export default function VenueDetailPage({ params }: { params: { id: string } }) 
           ))}
         </div>
 
-        {/* Content + Sidebar */}
-        <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_400px]">
-          {/* MAIN */}
+        {/* Booking matrix (full width, prominent) */}
+        <div className="mt-8">
+          <BookingMatrix venue={venue} />
+        </div>
+
+        {/* Content (single column, no sidebar now) */}
+        <div className="mt-8">
           <div>
             <Tabs defaultValue="overview" className="w-full">
               <TabsList>
@@ -265,15 +269,6 @@ export default function VenueDetailPage({ params }: { params: { id: string } }) 
               </TabsContent>
             </Tabs>
           </div>
-
-          {/* SIDEBAR (Booking widget) */}
-          <aside>
-            <div className="lg:sticky lg:top-24">
-              <div className="rounded-2xl border bg-card p-5 shadow-sm">
-                <BookingWidget venue={venue} />
-              </div>
-            </div>
-          </aside>
         </div>
       </main>
 

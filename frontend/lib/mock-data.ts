@@ -151,6 +151,16 @@ export type Court = {
 };
 
 export const COURTS: Court[] = [
+  { id: 'c1', name: 'Sân 1', surface: 'ARTIFICIAL_GRASS', indoor: false, capacity: 10, pricePerHour: 300_000 },
+  { id: 'c2', name: 'Sân 2', surface: 'ARTIFICIAL_GRASS', indoor: false, capacity: 10, pricePerHour: 300_000 },
+  { id: 'c3', name: 'Sân 3', surface: 'ARTIFICIAL_GRASS', indoor: false, capacity: 10, pricePerHour: 350_000 },
+  { id: 'c4', name: 'Sân 4', surface: 'ARTIFICIAL_GRASS', indoor: true, capacity: 10, pricePerHour: 400_000 },
+  { id: 'c5', name: 'Sân VIP 1', surface: 'ARTIFICIAL_GRASS', indoor: true, capacity: 14, pricePerHour: 500_000 },
+  { id: 'c6', name: 'Sân VIP 2', surface: 'ARTIFICIAL_GRASS', indoor: true, capacity: 14, pricePerHour: 500_000 },
+];
+
+/** @deprecated dùng để giữ backward compatibility cho booking flow cũ */
+export const _OLD_COURTS: Court[] = [
   { id: 'c1', name: 'Sân 1', surface: 'ARTIFICIAL_GRASS', indoor: false, capacity: 10, pricePerHour: 350_000 },
   { id: 'c2', name: 'Sân 2', surface: 'ARTIFICIAL_GRASS', indoor: false, capacity: 10, pricePerHour: 350_000 },
   { id: 'c3', name: 'Sân VIP', surface: 'ARTIFICIAL_GRASS', indoor: true, capacity: 14, pricePerHour: 500_000 },
@@ -246,5 +256,58 @@ export function mockSlotStatus(hour: string): 'available' | 'held' | 'booked' {
   const h = parseInt(hour.split(':')[0], 10);
   if (h === 18 || h === 19) return 'booked';
   if (h === 17) return 'held';
+  return 'available';
+}
+
+export type CellStatus = 'available' | 'held' | 'booked';
+
+/**
+ * Mock status cho mỗi (court, hour) — tạo ra pattern thực tế: tối nhiều sân kín,
+ * trưa thưa, một vài "held" rải rác.
+ */
+export function mockCellStatus(courtId: string, hour: string): CellStatus {
+  const h = parseInt(hour.split(':')[0], 10);
+  const courtIdx = parseInt(courtId.replace(/\D/g, ''), 10) || 0;
+
+  // Khung tối 18-21 đông
+  if (h === 18) {
+    if (['c1', 'c2', 'c5'].includes(courtId)) return 'booked';
+    if (courtId === 'c3') return 'held';
+    return 'available';
+  }
+  if (h === 19) {
+    if (['c1', 'c2', 'c3', 'c4', 'c5', 'c6'].includes(courtId)) return 'booked';
+    return 'available';
+  }
+  if (h === 20) {
+    if (['c2', 'c3', 'c5'].includes(courtId)) return 'booked';
+    if (courtId === 'c1') return 'held';
+    return 'available';
+  }
+  if (h === 21) {
+    if (['c1', 'c5'].includes(courtId)) return 'booked';
+    return 'available';
+  }
+
+  // Chiều 15-17
+  if (h === 17) {
+    if (courtId === 'c2') return 'booked';
+    if (courtId === 'c5') return 'held';
+    return 'available';
+  }
+  if (h === 16) {
+    if (courtId === 'c3') return 'booked';
+    return 'available';
+  }
+  if (h === 15) {
+    if (courtId === 'c1') return 'booked';
+    return 'available';
+  }
+
+  // Sáng 8-10 thưa
+  if (h === 8 && courtIdx % 2 === 0) return 'booked';
+  if (h === 9 && courtId === 'c4') return 'held';
+  if (h === 10 && courtId === 'c6') return 'booked';
+
   return 'available';
 }
