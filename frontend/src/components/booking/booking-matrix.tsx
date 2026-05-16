@@ -1,51 +1,91 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Calendar, ChevronLeft, ChevronRight, Tag, Wallet, ChevronRight as ArrowRight, ArrowLeftRight } from 'lucide-react';
+import {
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Tag,
+  Wallet,
+  ChevronRight as ArrowRight,
+  ArrowLeftRight,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { COURTS, TIME_SLOTS, mockCellStatus, type Venue, type CellStatus } from '@/lib/mock-data';
+import { getAvailability } from '@/lib/data/venues';
+import type {
+  AvailabilityResponse,
+  AvailabilityCourt,
+  CellStatus,
+} from '@/lib/api/endpoints/venues';
+import type { UiVenue } from '@/lib/api/adapters/venue';
 import { formatVND } from '@/lib/format';
 import { cn } from '@/lib/utils';
+
+type Axis = 'time-rows' | 'court-rows';
 
 interface SlotKey {
   courtId: string;
   hour: string;
 }
-
 const slotKey = (k: SlotKey) => `${k.courtId}__${k.hour}`;
 
-type Axis = 'time-rows' | 'court-rows';
-
-export function BookingMatrix({ venue }: { venue: Venue }) {
+export function BookingMatrix({ venue }: { venue: UiVenue }) {
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [selected, setSelected] = useState<Record<string, SlotKey>>({});
+  const [selected, setSelected] = useState<Record<string, SlotKey & { price: number }>>({});
   const [voucher, setVoucher] = useState('');
   const [axis, setAxis] = useState<Axis>('time-rows');
+  const [data, setData] = useState<AvailabilityResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    getAvailability(venue.id, date)
+      .then((res) => !cancelled && setData(res))
+      .catch(() => !cancelled && setData(null))
+      .finally(() => !cancelled && setLoading(false));
+    // Khi đổi ngày — clear selection để tránh slot không hợp lệ
+    setSelected({});
+    return () => {
+      cancelled = true;
+    };
+  }, [venue.id, date]);
+
+  const courts: AvailabilityCourt[] = data?.courts ?? [];
+
+  // Union các giờ unique từ tất cả courts (cells khác nhau theo slotDurationMinutes của court)
+  const allHours = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of courts) for (const cell of c.cells) set.add(cell.hour);
+    return Array.from(set).sort();
+  }, [courts]);
+
+  function cellOf(courtId: string, hour: string) {
+    const court = courts.find((c) => c.id === courtId);
+    return court?.cells.find((cell) => cell.hour === hour);
+  }
 
   const selectedList = Object.values(selected);
-
-  const subtotal = useMemo(() => {
-    return selectedList.reduce((sum, s) => {
-      const court = COURTS.find((c) => c.id === s.courtId);
-      return sum + (court?.pricePerHour ?? 0);
-    }, 0);
-  }, [selectedList]);
-
+  const subtotal = useMemo(
+    () => selectedList.reduce((sum, s) => sum + s.price, 0),
+    [selectedList],
+  );
   const discount =
-    voucher.trim().toLowerCase() === 'sport20'
-      ? Math.min(subtotal * 0.2, 50_000)
-      : 0;
+    voucher.trim().toLowerCase() === 'sport20' ? Math.min(subtotal * 0.2, 50_000) : 0;
   const total = Math.max(0, subtotal - discount);
 
-  function toggle(courtId: string, hour: string, status: CellStatus) {
-    if (status !== 'available') return;
+  function toggle(courtId: string, hour: string) {
+    const cell = cellOf(courtId, hour);
+    if (!cell || cell.status !== 'available') return;
     const key = slotKey({ courtId, hour });
     setSelected((prev) => {
       const next = { ...prev };
       if (next[key]) delete next[key];
-      else next[key] = { courtId, hour };
+      else next[key] = { courtId, hour, price: cell.price };
       return next;
     });
   }
@@ -56,17 +96,15 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
     setDate(d.toISOString().split('T')[0]);
   }
 
-  // For URL query
   const queryString = useMemo(() => {
     const slotsByCourt: Record<string, string[]> = {};
     for (const s of selectedList) {
       if (!slotsByCourt[s.courtId]) slotsByCourt[s.courtId] = [];
       slotsByCourt[s.courtId].push(s.hour);
     }
-    const parts = Object.entries(slotsByCourt).map(
-      ([c, hours]) => `${c}:${hours.sort().join(',')}`,
-    );
-    return parts.join(';');
+    return Object.entries(slotsByCourt)
+      .map(([c, hours]) => `${c}:${hours.sort().join(',')}`)
+      .join(';');
   }, [selectedList]);
 
   return (
@@ -80,17 +118,11 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
           </p>
         </div>
 
-        {/* Date picker + axis toggle */}
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setAxis(axis === 'time-rows' ? 'court-rows' : 'time-rows')}
-            title={
-              axis === 'time-rows'
-                ? 'Đảo trục: chuyển sân thành hàng, giờ thành cột'
-                : 'Đảo trục: chuyển giờ thành hàng, sân thành cột'
-            }
           >
             <ArrowLeftRight className="h-4 w-4" />
             <span className="hidden sm:inline">
@@ -122,24 +154,32 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
         <LegendDot label="Đã chọn" className="bg-primary" />
         <LegendDot label="Đang giữ chỗ" className="bg-warning/40 border border-warning/60" />
         <LegendDot label="Đã đặt" className="bg-muted text-muted-foreground" />
+        <LegendDot label="Đóng cửa" className="bg-muted/50 text-muted-foreground" />
       </div>
 
       {/* Matrix */}
       <div className="overflow-x-auto p-4">
-        {axis === 'time-rows' ? (
-          // Layout: rows = hours, cols = courts
+        {loading ? (
+          <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang tải lịch sân...
+          </div>
+        ) : courts.length === 0 || allHours.length === 0 ? (
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            Sân chưa có lịch / chưa cấu hình giờ mở cửa cho ngày này.
+          </div>
+        ) : axis === 'time-rows' ? (
           <table className="min-w-full border-separate" style={{ borderSpacing: 4 }}>
             <thead>
               <tr>
                 <th className="sticky left-0 z-10 w-20 bg-card pr-2 text-left">
                   <span className="text-xs uppercase tracking-wide text-muted-foreground">Giờ</span>
                 </th>
-                {COURTS.map((c) => (
+                {courts.map((c) => (
                   <th key={c.id} className="min-w-[110px] px-1">
                     <div className="rounded-md bg-muted/50 px-2 py-2 text-center">
                       <p className="text-sm font-bold">{c.name}</p>
                       <p className="text-[10px] text-muted-foreground">
-                        {formatVND(c.pricePerHour)}/h
+                        {minPrice(c) > 0 ? `${formatVND(minPrice(c))}/h` : '—'}
                       </p>
                     </div>
                   </th>
@@ -147,37 +187,37 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
               </tr>
             </thead>
             <tbody>
-              {TIME_SLOTS.map((hour) => (
+              {allHours.map((hour) => (
                 <tr key={hour}>
                   <td className="sticky left-0 z-10 bg-card pr-2 align-middle">
                     <span className="font-mono text-xs font-semibold text-muted-foreground">
                       {hour}
                     </span>
                   </td>
-                  {COURTS.map((c) => (
-                    <td key={c.id + hour} className="px-1 py-1">
-                      <Cell
-                        courtId={c.id}
-                        hour={hour}
-                        pricePerHour={c.pricePerHour}
-                        selected={!!selected[slotKey({ courtId: c.id, hour })]}
-                        onToggle={toggle}
-                      />
-                    </td>
-                  ))}
+                  {courts.map((c) => {
+                    const cell = c.cells.find((cl) => cl.hour === hour);
+                    return (
+                      <td key={c.id + hour} className="px-1 py-1">
+                        <Cell
+                          cell={cell}
+                          selected={!!selected[slotKey({ courtId: c.id, hour })]}
+                          onToggle={() => toggle(c.id, hour)}
+                        />
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
           </table>
         ) : (
-          // Layout: rows = courts, cols = hours
           <table className="min-w-full border-separate" style={{ borderSpacing: 4 }}>
             <thead>
               <tr>
                 <th className="sticky left-0 z-10 w-32 bg-card pr-2 text-left">
                   <span className="text-xs uppercase tracking-wide text-muted-foreground">Sân</span>
                 </th>
-                {TIME_SLOTS.map((h) => (
+                {allHours.map((h) => (
                   <th key={h} className="min-w-[110px] px-1">
                     <div className="rounded-md bg-muted/50 px-2 py-2 text-center">
                       <p className="font-mono text-xs font-bold">{h}</p>
@@ -187,27 +227,28 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
               </tr>
             </thead>
             <tbody>
-              {COURTS.map((c) => (
+              {courts.map((c) => (
                 <tr key={c.id}>
                   <td className="sticky left-0 z-10 w-32 bg-card pr-2 align-middle">
                     <div>
                       <p className="text-sm font-bold leading-tight">{c.name}</p>
                       <p className="text-[10px] text-muted-foreground">
-                        {formatVND(c.pricePerHour)}/h
+                        {minPrice(c) > 0 ? `${formatVND(minPrice(c))}/h` : '—'}
                       </p>
                     </div>
                   </td>
-                  {TIME_SLOTS.map((hour) => (
-                    <td key={c.id + hour} className="px-1 py-1">
-                      <Cell
-                        courtId={c.id}
-                        hour={hour}
-                        pricePerHour={c.pricePerHour}
-                        selected={!!selected[slotKey({ courtId: c.id, hour })]}
-                        onToggle={toggle}
-                      />
-                    </td>
-                  ))}
+                  {allHours.map((hour) => {
+                    const cell = c.cells.find((cl) => cl.hour === hour);
+                    return (
+                      <td key={c.id + hour} className="px-1 py-1">
+                        <Cell
+                          cell={cell}
+                          selected={!!selected[slotKey({ courtId: c.id, hour })]}
+                          onToggle={() => toggle(c.id, hour)}
+                        />
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -226,12 +267,12 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
               .slice()
               .sort((a, b) => (a.courtId + a.hour).localeCompare(b.courtId + b.hour))
               .map((s) => {
-                const court = COURTS.find((c) => c.id === s.courtId);
+                const court = courts.find((c) => c.id === s.courtId);
                 return (
                   <button
                     key={slotKey(s)}
                     type="button"
-                    onClick={() => toggle(s.courtId, s.hour, 'available')}
+                    onClick={() => toggle(s.courtId, s.hour)}
                     className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20"
                   >
                     {court?.name} · {s.hour}
@@ -260,9 +301,7 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
 
           <div className="space-y-2 rounded-lg bg-muted/40 p-4 md:min-w-[280px]">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                Tạm tính ({selectedList.length} slot)
-              </span>
+              <span className="text-muted-foreground">Tạm tính ({selectedList.length} slot)</span>
               <span className="font-medium">{formatVND(subtotal)}</span>
             </div>
             {discount > 0 && (
@@ -285,9 +324,7 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
           disabled={selectedList.length === 0}
         >
           {selectedList.length > 0 ? (
-            <Link
-              href={`/booking/new?venue=${venue.id}&slots=${encodeURIComponent(queryString)}`}
-            >
+            <Link href={`/booking/new?venue=${venue.id}&date=${date}&slots=${encodeURIComponent(queryString)}`}>
               <Wallet className="h-4 w-4" />
               Tiếp tục thanh toán
               <ArrowRight className="h-4 w-4" />
@@ -301,57 +338,70 @@ export function BookingMatrix({ venue }: { venue: Venue }) {
         </Button>
 
         <p className="mt-2 text-center text-[11px] text-muted-foreground">
-          Bằng cách đặt sân, bạn đồng ý với{' '}
-          <a className="underline" href="#">
-            Điều khoản
-          </a>{' '}
-          và{' '}
-          <a className="underline" href="#">
-            Chính sách huỷ
-          </a>
-          .
+          Bằng cách đặt sân, bạn đồng ý với <a className="underline" href="#">Điều khoản</a> và{' '}
+          <a className="underline" href="#">Chính sách huỷ</a>.
         </p>
       </div>
     </div>
   );
 }
 
+function minPrice(c: AvailabilityCourt): number {
+  let min = Infinity;
+  for (const cell of c.cells) {
+    if (cell.price > 0 && cell.price < min) min = cell.price;
+  }
+  return min === Infinity ? 0 : min;
+}
+
 function Cell({
-  courtId,
-  hour,
-  pricePerHour,
+  cell,
   selected,
   onToggle,
 }: {
-  courtId: string;
-  hour: string;
-  pricePerHour: number;
+  cell: { hour: string; price: number; status: CellStatus } | undefined;
   selected: boolean;
-  onToggle: (courtId: string, hour: string, status: CellStatus) => void;
+  onToggle: () => void;
 }) {
-  const status = mockCellStatus(courtId, hour);
-  const disabled = status === 'booked';
+  if (!cell) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="w-full rounded-md border bg-muted/40 px-2 py-2.5 text-xs font-semibold text-muted-foreground"
+      >
+        —
+      </button>
+    );
+  }
 
   let cellClass = '';
   let cellText: string;
+  let disabled = false;
   if (selected) {
     cellClass = 'bg-primary text-primary-foreground border-primary shadow-sm';
     cellText = '✓ Chọn';
-  } else if (status === 'booked') {
+  } else if (cell.status === 'booked') {
     cellClass = 'bg-muted text-muted-foreground cursor-not-allowed border-transparent line-through';
     cellText = 'Đã đặt';
-  } else if (status === 'held') {
+    disabled = true;
+  } else if (cell.status === 'held') {
     cellClass = 'bg-warning/15 text-amber-700 border-warning/40 dark:text-amber-300';
     cellText = 'Đang giữ';
+    disabled = true;
+  } else if (cell.status === 'closed') {
+    cellClass = 'bg-muted/40 text-muted-foreground/60 cursor-not-allowed border-transparent';
+    cellText = 'Đóng';
+    disabled = true;
   } else {
     cellClass = 'bg-background hover:border-primary hover:bg-primary/5 border';
-    cellText = formatVND(pricePerHour);
+    cellText = cell.price > 0 ? formatVND(cell.price) : '—';
   }
 
   return (
     <button
       type="button"
-      onClick={() => onToggle(courtId, hour, status)}
+      onClick={onToggle}
       disabled={disabled}
       className={cn(
         'w-full rounded-md border px-2 py-2.5 text-xs font-semibold transition-all',

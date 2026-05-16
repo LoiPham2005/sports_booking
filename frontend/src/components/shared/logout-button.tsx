@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm';
 import { logout } from '@/lib/data/auth';
+import { notifyAuthChanged } from '@/lib/use-current-user';
 import { isApiError } from '@/lib/api/errors';
 
 interface Props {
@@ -49,6 +50,7 @@ export function LogoutButton({
       toast.error(isApiError(e) ? e.message : 'Đăng xuất thất bại');
       return;
     }
+    notifyAuthChanged();
     toast.success('Đã đăng xuất');
     router.replace('/login');
     router.refresh();

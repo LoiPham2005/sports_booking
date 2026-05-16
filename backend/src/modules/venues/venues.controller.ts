@@ -29,6 +29,12 @@ export class VenuesController {
     return this.venues.detail(id);
   }
 
+  @Public()
+  @Get(':id/availability')
+  availability(@Param('id') id: string, @Query('date') date: string) {
+    return this.venues.availability(id, date);
+  }
+
   @ApiBearerAuth()
   @Roles(Role.OWNER, Role.ADMIN, Role.SUPER_ADMIN)
   @Post('/owner')

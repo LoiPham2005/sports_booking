@@ -17,6 +17,8 @@ export interface UiVenue {
   reviewCount: number;
   distance: number;
   image: string; // primary image URL
+  /** Tất cả ảnh + video của venue (chỉ có ở detail). */
+  images: { id: string; url: string; isPrimary: boolean }[];
   amenities: string[]; // slug list
   description?: string;
   phone?: string;
@@ -42,6 +44,7 @@ export function toUiVenue(dto: VenueDto): UiVenue {
     reviewCount: dto.ratingCount,
     distance: dto.distance ?? 0,
     image: primaryImage,
+    images: (dto.images ?? []).map((i) => ({ id: i.id, url: i.url, isPrimary: i.isPrimary })),
     amenities: (dto.amenities ?? []).map((a) => a.slug),
     description: dto.description ?? undefined,
     phone: dto.phone ?? undefined,

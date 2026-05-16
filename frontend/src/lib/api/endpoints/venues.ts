@@ -145,7 +145,39 @@ export const venuesApi = {
   // ─── Uploads (Supabase Storage qua backend) ───
   signUpload: (body: { kind: 'venue' | 'court' | 'avatar' | 'review'; contentType: string; sizeBytes: number }) =>
     apiPost<UploadSignResponse>('/uploads/sign', body),
+
+  // ─── Availability matrix ───
+  availability: (venueId: string, date: string) =>
+    apiGet<AvailabilityResponse>(
+      `/venues/${encodeURIComponent(venueId)}/availability`,
+      { query: { date } },
+    ),
 };
+
+export type CellStatus = 'available' | 'booked' | 'held' | 'closed';
+
+export interface AvailabilityCell {
+  hour: string; // "HH:MM"
+  startsAt: string;
+  endsAt: string;
+  price: number;
+  status: CellStatus;
+}
+
+export interface AvailabilityCourt {
+  id: string;
+  name: string;
+  sport: { id: string; slug: string; nameVi: string; icon: string | null };
+  slotDurationMinutes: number;
+  cells: AvailabilityCell[];
+}
+
+export interface AvailabilityResponse {
+  date: string;
+  openTime: string;
+  closeTime: string;
+  courts: AvailabilityCourt[];
+}
 
 export interface VenueHourDto {
   id: string;

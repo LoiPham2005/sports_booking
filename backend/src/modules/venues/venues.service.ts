@@ -1,5 +1,10 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, Role, VenueStatus } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { BookingStatus, Prisma, Role, VenueStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreateVenueDto, SearchVenuesDto, UpdateVenueDto } from './dto/venue.dto';
@@ -233,13 +238,136 @@ export class VenuesService {
     });
   }
 
+  // ─────────── Availability matrix ───────────
+
+  /**
+   * Trả về matrix `courts × hours` cho 1 ngày cụ thể.
+   *
+   * Mỗi cell: { hour: "06:00", price, status: 'available'|'booked'|'held'|'closed' }
+   * - `closed`: venue đóng cửa giờ đó (theo VenueHour) hoặc court có CourtClosure
+   * - `booked`: có booking active (CONFIRMED/CHECKED_IN/COMPLETED) overlap giờ đó
+   * - `held`: có booking PENDING_PAYMENT (đang giữ chỗ tạm thời)
+   * - `available`: còn trống
+   *
+   * `date` format YYYY-MM-DD. Giờ chia theo `slotDurationMinutes` của court.
+   */
+  async availability(venueId: string, date: string) {
+    const day = new Date(date + 'T00:00:00');
+    if (Number.isNaN(day.getTime())) {
+      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD.');
+    }
+    const dayOfWeek = day.getDay();
+    const dayStart = new Date(day);
+    const dayEnd = new Date(day);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+
+    const [venue, hours, courts] = await Promise.all([
+      this.prisma.venue.findUnique({ where: { id: venueId }, select: { id: true } }),
+      this.prisma.venueHour.findMany({ where: { venueId, dayOfWeek } }),
+      this.prisma.court.findMany({
+        where: { venueId, isActive: true, deletedAt: null },
+        include: {
+          sport: { select: { id: true, slug: true, nameVi: true, icon: true } },
+          priceRules: { where: { dayOfWeek } },
+          closures: {
+            where: {
+              startsAt: { lt: dayEnd },
+              endsAt: { gt: dayStart },
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+    if (!venue) throw new NotFoundException();
+
+    // Default open 06:00–22:00 nếu chưa cấu hình
+    const openTime = hours[0]?.openTime ?? '06:00';
+    const closeTime = hours[0]?.closeTime ?? '22:00';
+
+    const courtIds = courts.map((c) => c.id);
+    const bookings = await this.prisma.booking.findMany({
+      where: {
+        courtId: { in: courtIds },
+        startsAt: { lt: dayEnd },
+        endsAt: { gt: dayStart },
+        status: {
+          in: [
+            BookingStatus.PENDING_PAYMENT,
+            BookingStatus.CONFIRMED,
+            BookingStatus.CHECKED_IN,
+            BookingStatus.COMPLETED,
+          ],
+        },
+      },
+      select: { courtId: true, startsAt: true, endsAt: true, status: true },
+    });
+
+    const result = courts.map((court) => {
+      const slotMin = court.slotDurationMinutes ?? 60;
+      const slots = enumerateSlots(date, openTime, closeTime, slotMin);
+      const cells = slots.map((slot) => {
+        // Status check
+        let status: 'available' | 'booked' | 'held' | 'closed' = 'available';
+
+        // Closure
+        const inClosure = court.closures.some(
+          (cl) => cl.startsAt < slot.endsAt && cl.endsAt > slot.startsAt,
+        );
+        if (inClosure) status = 'closed';
+
+        // Booking conflict
+        if (status === 'available') {
+          for (const b of bookings) {
+            if (b.courtId !== court.id) continue;
+            if (b.startsAt < slot.endsAt && b.endsAt > slot.startsAt) {
+              status = b.status === BookingStatus.PENDING_PAYMENT ? 'held' : 'booked';
+              break;
+            }
+          }
+        }
+
+        // Price từ priceRule khớp giờ
+        const hh = slot.startsAt.toTimeString().slice(0, 5);
+        const rule = court.priceRules.find(
+          (r) => r.startTime <= hh && hh < r.endTime,
+        );
+        const price = rule ? Number(rule.pricePerSlot) : 0;
+
+        return {
+          hour: hh,
+          startsAt: slot.startsAt.toISOString(),
+          endsAt: slot.endsAt.toISOString(),
+          price,
+          status,
+        };
+      });
+      return {
+        id: court.id,
+        name: court.name,
+        sport: court.sport,
+        slotDurationMinutes: slotMin,
+        cells,
+      };
+    });
+
+    return {
+      date,
+      openTime,
+      closeTime,
+      courts: result,
+    };
+  }
+
   async deleteImage(venueId: string, ownerId: string, imageId: string) {
     await this.assertOwner(venueId, ownerId);
     const img = await this.prisma.venueImage.findFirst({ where: { id: imageId, venueId } });
     if (!img) return { ok: true };
     // Xoá file thật trên Supabase Storage trước (nếu có key)
-    if (img.key) {
-      await this.uploads.remove(img.key).catch(() => {
+    // Note: `key` field mới thêm; nếu Prisma client chưa regen sau db push, cast tạm để compile.
+    const key = (img as unknown as { key?: string | null }).key;
+    if (key) {
+      await this.uploads.remove(key).catch(() => {
         // Log nhưng vẫn cho xoá DB row — tránh kẹt nếu Supabase không reach được
       });
     }
@@ -360,4 +488,30 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/**
+ * Tạo list slot trong ngày từ openTime → closeTime, mỗi slot dài `stepMinutes`.
+ * `dateStr` format YYYY-MM-DD.
+ */
+function enumerateSlots(
+  dateStr: string,
+  openTime: string,
+  closeTime: string,
+  stepMinutes: number,
+): { startsAt: Date; endsAt: Date }[] {
+  const [oh, om] = openTime.split(':').map(Number);
+  const [ch, cm] = closeTime.split(':').map(Number);
+  const slots: { startsAt: Date; endsAt: Date }[] = [];
+  let cur = new Date(`${dateStr}T00:00:00`);
+  cur.setHours(oh, om, 0, 0);
+  const end = new Date(`${dateStr}T00:00:00`);
+  end.setHours(ch, cm, 0, 0);
+
+  while (cur.getTime() + stepMinutes * 60_000 <= end.getTime()) {
+    const next = new Date(cur.getTime() + stepMinutes * 60_000);
+    slots.push({ startsAt: new Date(cur), endsAt: next });
+    cur = next;
+  }
+  return slots;
 }

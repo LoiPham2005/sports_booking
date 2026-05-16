@@ -98,6 +98,17 @@ export async function toggleFavorite(venueId: string, currentlyFavorited: boolea
   else await usersApi.addFavorite(venueId);
 }
 
+/** Check 1 venue có nằm trong favorites của user hiện tại không. */
+export async function isFavorite(venueId: string): Promise<boolean> {
+  if (USE_MOCK) return mockFavoriteIds.has(venueId);
+  try {
+    const list = await usersApi.favorites();
+    return list.some((v) => v.id === venueId);
+  } catch {
+    return false;
+  }
+}
+
 // ─────────────── Notifications ───────────────
 
 const mockNotifState = mockNotifications.map((n) => ({ ...n }));

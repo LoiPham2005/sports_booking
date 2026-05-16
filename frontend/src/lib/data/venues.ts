@@ -20,14 +20,23 @@ import {
   type AddVenueImageInput,
   type PriceRuleDto,
   type PriceRuleInput,
+  type AvailabilityResponse,
+  type CellStatus,
 } from '@/lib/api/endpoints/venues';
 import { sportsApi } from '@/lib/api/endpoints/sports';
+import { reviewsApi, type ReviewDto } from '@/lib/api/endpoints/reviews';
 import { toUiVenue, type UiVenue, type UiSport, type UiCourt } from '@/lib/api/adapters/venue';
 import { VENUES, SPORTS, COURTS, SURFACES } from '@/lib/mock-data';
 
 // ─────────── Mock → UI adapters ───────────
 
 function mockVenueToUi(v: (typeof VENUES)[number]): UiVenue {
+  // Mock gallery: 1 primary + 3 ảnh khác từ Unsplash để đủ 4 ô gallery
+  const extra = [
+    'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=800&auto=format&fit=crop',
+  ];
   return {
     id: v.id,
     name: v.name,
@@ -41,6 +50,10 @@ function mockVenueToUi(v: (typeof VENUES)[number]): UiVenue {
     reviewCount: v.reviewCount,
     distance: v.distance,
     image: v.image,
+    images: [
+      { id: `${v.id}-img-0`, url: v.image, isPrimary: true },
+      ...extra.map((url, i) => ({ id: `${v.id}-img-${i + 1}`, url, isPrimary: false })),
+    ],
     amenities: v.amenities,
     lat: v.lat,
     lng: v.lng,
@@ -416,5 +429,115 @@ export async function uploadMedia(
   return { url: signed.publicUrl, key: signed.fileKey };
 }
 
+// ─────── Reviews ───────
+
+const MOCK_REVIEWS: ReviewDto[] = [
+  {
+    id: 'mock-r1',
+    userId: 'u1',
+    venueId: 'mock',
+    rating: 5,
+    content: 'Sân chất lượng, mặt sân êm. Nhân viên nhiệt tình. Sẽ quay lại.',
+    ownerReply: null,
+    ownerRepliedAt: null,
+    createdAt: new Date(Date.now() - 2 * 24 * 3600_000).toISOString(),
+    user: { id: 'u1', fullName: 'Minh Trần', avatarUrl: null },
+  },
+  {
+    id: 'mock-r2',
+    userId: 'u2',
+    venueId: 'mock',
+    rating: 5,
+    content: 'Vị trí thuận tiện, bãi gửi xe rộng. Phòng thay đồ sạch sẽ.',
+    ownerReply: 'Cảm ơn anh đã ủng hộ!',
+    ownerRepliedAt: new Date(Date.now() - 6 * 24 * 3600_000).toISOString(),
+    createdAt: new Date(Date.now() - 7 * 24 * 3600_000).toISOString(),
+    user: { id: 'u2', fullName: 'Hà Nguyễn', avatarUrl: null },
+  },
+  {
+    id: 'mock-r3',
+    userId: 'u3',
+    venueId: 'mock',
+    rating: 4,
+    content: 'Sân ổn, giá hợp lý. Buổi tối hơi đông cần đặt sớm.',
+    ownerReply: null,
+    ownerRepliedAt: null,
+    createdAt: new Date(Date.now() - 14 * 24 * 3600_000).toISOString(),
+    user: { id: 'u3', fullName: 'Đức Phạm', avatarUrl: null },
+  },
+];
+
+export async function listReviews(
+  venueId: string,
+  sort?: 'recent' | 'rating',
+): Promise<ReviewDto[]> {
+  if (USE_MOCK) {
+    const sorted = [...MOCK_REVIEWS];
+    if (sort === 'rating') sorted.sort((a, b) => b.rating - a.rating);
+    return sorted;
+  }
+  return reviewsApi.listByVenue(venueId, sort);
+}
+
+// ─────── Availability matrix ───────
+
+/**
+ * Lấy availability matrix cho 1 ngày.
+ * - USE_MOCK=true: tự gen từ mock courts + random status (deterministic theo court+hour)
+ * - USE_MOCK=false: GET /venues/:id/availability
+ */
+export async function getAvailability(
+  venueId: string,
+  date: string,
+): Promise<AvailabilityResponse> {
+  if (USE_MOCK) {
+    return mockAvailability(venueId, date);
+  }
+  return venuesApi.availability(venueId, date);
+}
+
+function mockAvailability(venueId: string, date: string): AvailabilityResponse {
+  // Sinh data từ mock COURTS — luôn 6 sân, 06:00–22:00, slot 60 phút
+  const openTime = '06:00';
+  const closeTime = '22:00';
+  const hours: string[] = [];
+  for (let h = 6; h < 22; h++) hours.push(`${String(h).padStart(2, '0')}:00`);
+
+  // Deterministic pseudo-random theo (courtId + date + hour) — refresh page giữ nguyên status
+  function statusFor(courtId: string, hour: string): CellStatus {
+    const key = `${courtId}-${date}-${hour}`;
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) | 0;
+    const r = Math.abs(hash) % 100;
+    if (r < 8) return 'booked';
+    if (r < 12) return 'held';
+    return 'available';
+  }
+
+  return {
+    date,
+    openTime,
+    closeTime,
+    courts: COURTS.map((c) => ({
+      id: `${venueId}-${c.id}`,
+      name: c.name,
+      sport: { id: 'mock-sport', slug: 'football_5', nameVi: 'Bóng đá', icon: '⚽' },
+      slotDurationMinutes: 60,
+      cells: hours.map((hh) => {
+        const dateObj = new Date(`${date}T${hh}:00`);
+        const endObj = new Date(dateObj.getTime() + 60 * 60_000);
+        return {
+          hour: hh,
+          startsAt: dateObj.toISOString(),
+          endsAt: endObj.toISOString(),
+          price: c.pricePerHour,
+          status: statusFor(c.id, hh),
+        };
+      }),
+    })),
+  };
+}
+
 // Re-export UI types để page khỏi import nhiều chỗ.
-export type { UiVenue, UiSport, UiVenueDetail };
+export type { UiVenue, UiSport, UiVenueDetail, ReviewDto };
+export type { AvailabilityResponse, CellStatus };

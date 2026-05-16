@@ -10,6 +10,9 @@ import { authApi } from '@/lib/api/endpoints/auth';
 import { homePathByRole } from '@/lib/api/adapters/user';
 import { USE_MOCK } from '@/lib/api/config';
 import { isApiError } from '@/lib/api/errors';
+import { setMockUser } from '@/lib/data/auth';
+import { notifyAuthChanged } from '@/lib/use-current-user';
+import type { Role } from '@/lib/api/types';
 
 function LoginInner() {
   const router = useRouter();
@@ -24,6 +27,8 @@ function LoginInner() {
     setSubmitting(true);
     try {
       const result = await authApi.login({ identifier: id, password: pwd });
+      // Cập nhật cache user (API mode — useCurrentUser sẽ refetch /me)
+      notifyAuthChanged();
       toast.success(`Xin chào, ${result.user.fullName}`);
       router.replace(nextPath || homePathByRole(result.user.role));
       router.refresh();
@@ -41,6 +46,21 @@ function LoginInner() {
       toast.error('Vui lòng nhập đủ thông tin');
       return;
     }
+    if (USE_MOCK) {
+      // Mock mode: chấp nhận mọi credential, tạo user generic CUSTOMER
+      setMockUser({
+        id: 'mock-customer',
+        fullName: identifier.split('@')[0] || 'Customer',
+        email: identifier.includes('@') ? identifier : undefined,
+        phone: identifier.includes('@') ? undefined : identifier,
+        role: 'CUSTOMER' as Role,
+      });
+      notifyAuthChanged();
+      toast.success('Đã đăng nhập (mock)');
+      router.replace(nextPath || '/');
+      router.refresh();
+      return;
+    }
     await login(identifier, password);
   }
 
@@ -48,7 +68,15 @@ function LoginInner() {
     setIdentifier(account.email);
     setPassword(account.password);
     if (USE_MOCK) {
-      // Mock mode — chỉ điền form, user nhấn Đăng nhập (vì mock chấp nhận mọi credential)
+      // Mock mode — set user theo role chip + redirect
+      setMockUser({
+        id: `mock-${account.label.toLowerCase()}`,
+        fullName: `Demo ${account.label}`,
+        email: account.email,
+        role: account.role,
+      });
+      notifyAuthChanged();
+      toast.success(`Đã đăng nhập với role ${account.label}`);
       router.replace(account.path);
       return;
     }
@@ -133,6 +161,7 @@ interface SeedAccount {
   icon: string;
   color: string;
   path: string;
+  role: Role;
 }
 
 const SEED_ACCOUNTS: SeedAccount[] = [
@@ -143,6 +172,7 @@ const SEED_ACCOUNTS: SeedAccount[] = [
     icon: '👤',
     color: 'text-primary hover:border-primary hover:bg-primary/5',
     path: '/',
+    role: 'CUSTOMER',
   },
   {
     email: 'owner@gmail.com',
@@ -151,6 +181,7 @@ const SEED_ACCOUNTS: SeedAccount[] = [
     icon: '🏟️',
     color: 'text-accent hover:border-accent hover:bg-accent/5',
     path: '/owner',
+    role: 'OWNER',
   },
   {
     email: 'staff@gmail.com',
@@ -159,6 +190,7 @@ const SEED_ACCOUNTS: SeedAccount[] = [
     icon: '🔧',
     color: 'text-orange-500 hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/20',
     path: '/staff',
+    role: 'STAFF',
   },
   {
     email: 'manager@gmail.com',
@@ -167,6 +199,7 @@ const SEED_ACCOUNTS: SeedAccount[] = [
     icon: '👑',
     color: 'text-violet-500 hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/20',
     path: '/staff?role=manager',
+    role: 'STAFF',
   },
   {
     email: 'admin@gmail.com',
@@ -175,6 +208,7 @@ const SEED_ACCOUNTS: SeedAccount[] = [
     icon: '⚡',
     color: 'text-purple-500 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20',
     path: '/admin',
+    role: 'ADMIN',
   },
 ];
 

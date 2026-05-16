@@ -360,15 +360,24 @@ export function PricesEditor({ courts }: { courts: UiCourt[] }) {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Giá / slot (VND)</Label>
-              <Input
-                type="number"
-                min={0}
-                step={1000}
-                value={pricePerSlot}
-                onChange={(e) => setPricePerSlot(Number(e.target.value) || 0)}
-                required
-              />
+              <Label>Giá / slot</Label>
+              <div className="relative">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  className="pr-10 text-right font-mono tabular-nums"
+                  value={pricePerSlot ? pricePerSlot.toLocaleString('vi-VN') : ''}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^\d]/g, '');
+                    setPricePerSlot(Number(raw) || 0);
+                  }}
+                  placeholder="100.000"
+                  required
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
+                  ₫
+                </span>
+              </div>
               <p className="text-xs text-muted-foreground">
                 Slot = thời lượng đặt mặc định của sân (60 phút mặc định, đổi ở tab Sân con).
               </p>
