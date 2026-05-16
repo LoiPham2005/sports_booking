@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { logout } from '@/lib/data/auth';
 import { isApiError } from '@/lib/api/errors';
+import { useConfirm } from '@/components/ui/confirm';
 import { cn } from '@/lib/utils';
 
 const NAV = [
@@ -44,9 +45,17 @@ const SUPER_NAV = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const confirm = useConfirm();
 
   async function handleLogout() {
-    if (!confirm('Đăng xuất khỏi tài khoản?')) return;
+    const ok = await confirm({
+      title: 'Đăng xuất khỏi tài khoản?',
+      description: 'Bạn sẽ cần đăng nhập lại để truy cập Admin Portal.',
+      confirmText: 'Đăng xuất',
+      cancelText: 'Ở lại',
+      tone: 'warning',
+    });
+    if (!ok) return;
     try {
       await logout();
     } catch (e) {

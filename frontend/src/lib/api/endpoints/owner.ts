@@ -35,6 +35,18 @@ export interface CreateWalkInInput {
 export type StaffStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REMOVED';
 export type StaffRole = 'MANAGER' | 'STAFF';
 
+export interface CreateVenueInput {
+  name: string;
+  addressLine: string;
+  city: string;
+  ward?: string;
+  district?: string;
+  description?: string;
+  phone?: string;
+  lat?: number;
+  lng?: number;
+}
+
 export interface StaffMemberDto {
   id: string;
   venueId: string;
@@ -120,6 +132,11 @@ export const ownerApi = {
   listVenues: async (): Promise<UiVenue[]> => {
     const list = await apiGet<VenueDto[]>('/venues/owner/list');
     return list.map(toUiVenue);
+  },
+
+  createVenue: async (body: CreateVenueInput): Promise<UiVenue> => {
+    const dto = await apiPost<VenueDto>('/venues/owner', body);
+    return toUiVenue(dto);
   },
 
   staff: (venueId?: string) =>

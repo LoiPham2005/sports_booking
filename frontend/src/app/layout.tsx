@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import { Toaster } from 'sonner';
+import { Providers } from '@/components/providers';
 import './globals.css';
 
 const inter = Inter({
@@ -23,8 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="vi" className={inter.variable} suppressHydrationWarning>
       <body>
-        {children}
-        <Toaster position="top-right" richColors closeButton />
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

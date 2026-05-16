@@ -4,6 +4,7 @@
 import { USE_MOCK } from '@/lib/api/config';
 import {
   ownerApi,
+  type CreateVenueInput,
   type CreateWalkInInput,
   type InviteStaffInput,
   type OwnerDashboard,
@@ -50,6 +51,9 @@ function mockBookingToUi(b: (typeof BOOKINGS)[number]): UiBooking {
 }
 
 // ─────── Mock data ───────
+
+// Mock owner venues — start với 2 venue đầu trong VENUES, có thể thêm vào runtime
+let mockOwnerVenuesState: UiVenue[] = VENUES.slice(0, 2).map(mockVenueToUi);
 
 const MOCK_DASHBOARD: OwnerDashboard = {
   venueCount: 2,
@@ -139,8 +143,43 @@ export async function getOwnerDashboard(): Promise<OwnerDashboard> {
 }
 
 export async function listOwnerVenues(): Promise<UiVenue[]> {
-  if (USE_MOCK) return VENUES.slice(0, 2).map(mockVenueToUi);
+  if (USE_MOCK) return mockOwnerVenuesState;
   return ownerApi.listVenues();
+}
+
+export async function createOwnerVenue(body: CreateVenueInput): Promise<UiVenue> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 300));
+    const id = `mock-v-${Date.now()}`;
+    const ui: UiVenue = {
+      id,
+      name: body.name,
+      slug: body.name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || id,
+      address: body.addressLine,
+      city: body.city,
+      district: body.district ?? '',
+      sports: [],
+      priceFrom: 0,
+      rating: 0,
+      reviewCount: 0,
+      distance: 0,
+      image:
+        'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=800&auto=format&fit=crop',
+      amenities: [],
+      description: body.description,
+      phone: body.phone,
+      lat: body.lat,
+      lng: body.lng,
+    };
+    mockOwnerVenuesState = [ui, ...mockOwnerVenuesState];
+    return ui;
+  }
+  return ownerApi.createVenue(body);
 }
 
 export async function listOwnerBookings(params: {
