@@ -7,6 +7,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { TimePicker24 } from '@/components/ui/time-picker';
+import { PriceTimeline } from './price-timeline';
 import {
   Dialog,
   DialogContent,
@@ -66,11 +68,18 @@ export function PricesEditor({ courts }: { courts: UiCourt[] }) {
     [rules],
   );
 
-  function openCreate() {
+  function openCreate(prefillDay?: number, prefillStart?: string) {
     setEditing(null);
-    setDayOfWeek(1);
-    setStartTime('06:00');
-    setEndTime('17:00');
+    setDayOfWeek(prefillDay ?? 1);
+    setStartTime(prefillStart ?? '06:00');
+    // Default endTime = +1h từ start
+    if (prefillStart) {
+      const [h] = prefillStart.split(':');
+      const endHour = Math.min(Number(h) + 1, 23);
+      setEndTime(`${String(endHour).padStart(2, '0')}:00`);
+    } else {
+      setEndTime('17:00');
+    }
     setPricePerSlot(100_000);
     setOpen(true);
   }
@@ -151,10 +160,23 @@ export function PricesEditor({ courts }: { courts: UiCourt[] }) {
             </option>
           ))}
         </select>
-        <Button size="sm" className="ml-auto" onClick={openCreate}>
+        <Button size="sm" className="ml-auto" onClick={() => openCreate()}>
           <Plus className="h-4 w-4" /> Thêm khung giá
         </Button>
       </div>
+
+      {/* Timeline trực quan — 7 ngày × 24h */}
+      {!loading && (
+        <Card className="p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-sm font-semibold">Lịch giá trong tuần</h4>
+            <span className="text-[11px] text-muted-foreground">
+              Click ô trống để thêm · Click block để sửa
+            </span>
+          </div>
+          <PriceTimeline rules={sorted} onAdd={openCreate} onEdit={openEdit} />
+        </Card>
+      )}
 
       <Card className="overflow-hidden">
         {loading ? (
@@ -243,21 +265,11 @@ export function PricesEditor({ courts }: { courts: UiCourt[] }) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Giờ bắt đầu</Label>
-                <Input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  required
-                />
+                <TimePicker24 value={startTime} onChange={setStartTime} />
               </div>
               <div className="space-y-1.5">
                 <Label>Giờ kết thúc</Label>
-                <Input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  required
-                />
+                <TimePicker24 value={endTime} onChange={setEndTime} />
               </div>
             </div>
 
