@@ -34,6 +34,11 @@ export default () => ({
     forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
     publicUrl: process.env.S3_PUBLIC_URL,
   },
+  supabase: {
+    url: process.env.SUPABASE_URL ?? '',
+    key: process.env.SUPABASE_KEY ?? '',
+    bucket: process.env.SUPABASE_BUCKET ?? 'sports_booking',
+  },
   booking: {
     holdMinutes: parseInt(process.env.BOOKING_HOLD_MINUTES ?? '10', 10),
     paymentTimeoutMinutes: parseInt(process.env.BOOKING_PAYMENT_TIMEOUT_MINUTES ?? '15', 10),

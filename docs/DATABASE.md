@@ -74,7 +74,9 @@ Index: (email), (phone), (role).
 | slug | string unique | |
 | description | text | |
 | addressLine | string | |
-| ward, district, city, country | string | |
+| ward, district, city, country | string | Legacy địa chỉ (trước reform 7/2025), giữ để backward-compat |
+| newCity, newWard | string? | Địa chỉ sau cải cách hành chính 7/2025 — luôn populate khi tạo qua dropdown. Dùng làm cột chính cho search |
+| provinceCode, wardCode | string? | Mã hành chính chính thức (theo openapi.vn / chinhphu.vn) |
 | lat, lng | decimal | có index GiST cho geo |
 | phone | string? | |
 | status | enum | DRAFT/PENDING/APPROVED/SUSPENDED |
@@ -90,6 +92,8 @@ Index:
 
 ### VenueImage
 - `{ id, venueId, url, sort, isPrimary }`
+- Khi `isPrimary=true` qua API → các ảnh khác cùng venue tự bị `isPrimary=false`. Ảnh đầu tiên thêm vào sẽ auto-primary.
+- URL public từ Supabase Storage public bucket: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${key}`.
 
 ### Amenity / VenueAmenity
 - `Amenity { id, slug, nameVi, nameEn, icon }` — danh mục.

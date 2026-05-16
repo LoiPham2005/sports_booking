@@ -71,6 +71,7 @@ export function toUiCourt(dto: CourtDto): UiCourt {
 }
 
 export interface UiSport {
+  id: string;
   slug: string;
   name: string;
   icon: string;
@@ -79,6 +80,7 @@ export interface UiSport {
 
 export function toUiSport(dto: SportDto): UiSport {
   return {
+    id: dto.id,
     slug: dto.slug,
     name: dto.nameVi,
     icon: dto.icon ?? '🏟️',

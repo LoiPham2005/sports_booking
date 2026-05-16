@@ -103,3 +103,39 @@
     scrollbar-width: none;
   }
 }
+
+/* ─── Checkbox custom: nền primary + check trắng rõ ─── */
+input[type='checkbox']:not([class*='accent-']) {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 1.5px solid hsl(var(--border));
+  border-radius: 4px;
+  background: hsl(var(--background));
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-content: center;
+}
+input[type='checkbox']:not([class*='accent-']):hover:not(:disabled) {
+  border-color: hsl(var(--primary));
+}
+input[type='checkbox']:not([class*='accent-']):checked {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3 8 6.5 11.5 13 4.5'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+input[type='checkbox']:not([class*='accent-']):disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+input[type='checkbox']:not([class*='accent-']):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}

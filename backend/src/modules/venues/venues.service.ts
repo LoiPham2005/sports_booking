@@ -162,6 +162,80 @@ export class VenuesService {
     });
   }
 
+  // ─────────── Hours ───────────
+
+  async listHours(venueId: string) {
+    return this.prisma.venueHour.findMany({
+      where: { venueId },
+      orderBy: { dayOfWeek: 'asc' },
+    });
+  }
+
+  /**
+   * Replace toàn bộ giờ mở cửa của venue (xoá hết rồi tạo lại).
+   * Mỗi ngày có thể có nhiều slot (vd nghỉ trưa: 6-12 + 13-22).
+   */
+  async upsertHours(
+    venueId: string,
+    ownerId: string,
+    hours: { dayOfWeek: number; openTime: string; closeTime: string }[],
+  ) {
+    await this.assertOwner(venueId, ownerId);
+    await this.prisma.$transaction([
+      this.prisma.venueHour.deleteMany({ where: { venueId } }),
+      this.prisma.venueHour.createMany({
+        data: hours.map((h) => ({
+          venueId,
+          dayOfWeek: h.dayOfWeek,
+          openTime: h.openTime,
+          closeTime: h.closeTime,
+        })),
+      }),
+    ]);
+    return this.listHours(venueId);
+  }
+
+  // ─────────── Images ───────────
+
+  async listImages(venueId: string) {
+    return this.prisma.venueImage.findMany({
+      where: { venueId },
+      orderBy: [{ isPrimary: 'desc' }, { sort: 'asc' }],
+    });
+  }
+
+  async addImage(
+    venueId: string,
+    ownerId: string,
+    dto: { url: string; key?: string; sort?: number; isPrimary?: boolean },
+  ) {
+    await this.assertOwner(venueId, ownerId);
+    // Nếu set isPrimary=true → un-set primary của các ảnh khác cùng venue
+    if (dto.isPrimary) {
+      await this.prisma.venueImage.updateMany({
+        where: { venueId, isPrimary: true },
+        data: { isPrimary: false },
+      });
+    }
+    const current = await this.prisma.venueImage.count({ where: { venueId } });
+    return this.prisma.venueImage.create({
+      data: {
+        venueId,
+        url: dto.url,
+        sort: dto.sort ?? current,
+        isPrimary: dto.isPrimary ?? current === 0, // ảnh đầu auto-primary
+      },
+    });
+  }
+
+  async deleteImage(venueId: string, ownerId: string, imageId: string) {
+    await this.assertOwner(venueId, ownerId);
+    const img = await this.prisma.venueImage.findFirst({ where: { id: imageId, venueId } });
+    if (!img) return { ok: true };
+    await this.prisma.venueImage.delete({ where: { id: imageId } });
+    return { ok: true };
+  }
+
   async assertOwner(venueId: string, userId: string, allowStaff = false) {
     const venue = await this.prisma.venue.findUnique({
       where: { id: venueId },

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { CurrentUser, JwtUser } from '../../common/decorators/current-user.decorator';
@@ -51,5 +51,23 @@ export class PricingController {
     @Body() dto: CreatePriceOverrideDto,
   ) {
     return this.pricing.addOverride(courtId, user.sub, dto);
+  }
+
+  @ApiBearerAuth()
+  @Roles(Role.OWNER, Role.ADMIN, Role.SUPER_ADMIN)
+  @Patch('owner/price-rules/:id')
+  updateRule(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CreatePriceRuleDto,
+  ) {
+    return this.pricing.updateRule(id, user.sub, dto);
+  }
+
+  @ApiBearerAuth()
+  @Roles(Role.OWNER, Role.ADMIN, Role.SUPER_ADMIN)
+  @Delete('owner/price-rules/:id')
+  deleteRule(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+    return this.pricing.deleteRule(id, user.sub);
   }
 }

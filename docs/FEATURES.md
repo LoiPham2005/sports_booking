@@ -102,8 +102,16 @@ Một **Venue** là 1 địa điểm vật lý (ví dụ "Sân bóng A Phú Mỹ
 - `GET /venues/nearby?lat=..&lng=..&radiusKm=5`.
 
 ### Owner
-- `POST /owner/venues` — tạo venue (cần duyệt admin trước khi public).
-- `PATCH /owner/venues/:id` — cập nhật.
+- `POST /venues/owner` — tạo venue (status mặc định `PENDING` → admin duyệt mới public). Body: `CreateVenueDto` gồm `name, addressLine, city, district?, ward?, newCity?, newWard?, provinceCode?, wardCode?, lat?, lng?, phone?, description?`.
+- `PATCH /venues/owner/:id` — cập nhật thông tin venue.
+- `GET /venues/owner/list` — list venue do owner sở hữu.
+- `POST /owner/venues/:venueId/courts` — tạo sân con (body: `name, sportId, surface, indoor?, capacity?, slotDurationMinutes?`).
+- `PATCH /owner/courts/:id` — cập nhật sân con.
+- `DELETE /owner/courts/:id` — soft delete sân con (giữ booking lịch sử).
+- `GET /venues/:id/hours` / `PUT /venues/owner/:id/hours` — list + replace giờ mở cửa theo tuần (body: `{ hours: [{ dayOfWeek, openTime, closeTime }] }`, support nhiều slot/ngày để nghỉ trưa).
+- `GET /venues/:id/images` / `POST /venues/owner/:id/images` / `DELETE /venues/owner/:id/images/:imageId` — quản lý ảnh venue. Body POST: `{ url, key?, sort?, isPrimary? }` — set primary=true sẽ tự un-set ảnh khác cùng venue.
+- `GET /courts/:id/price-rules` / `POST /owner/courts/:id/price-rules` / `PATCH /owner/price-rules/:id` / `DELETE /owner/price-rules/:id` — CRUD bảng giá theo khung giờ (body: `{ dayOfWeek, startTime, endTime, pricePerSlot }`).
+- `POST /uploads/sign` — tạo signed upload URL Supabase Storage (5 phút). Body: `{ kind: 'venue'|'court'|'avatar'|'review', contentType, sizeBytes }`. Max 50MB, hỗ trợ JPG/PNG/WebP/GIF/MP4/MOV. Trả về `{ uploadUrl, token, fileKey, publicUrl, expiresIn }`.
 - `POST /owner/venues/:id/images` — upload nhiều ảnh.
 - `POST /owner/venues/:id/amenities` — gắn tiện ích (wifi, đèn LED, phòng thay đồ...).
 - `POST /owner/venues/:id/hours` — giờ mở cửa theo thứ trong tuần + ngày lễ.

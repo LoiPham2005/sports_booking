@@ -2,14 +2,20 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { VenueStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
   IsEnum,
+  IsInt,
   IsLatitude,
   IsLongitude,
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Max,
   Min,
+  ValidateNested,
 } from 'class-validator';
 
 export class SearchVenuesDto {
@@ -48,4 +54,29 @@ export class CreateVenueDto {
 
 export class UpdateVenueDto extends CreateVenueDto {
   @IsOptional() @IsEnum(VenueStatus) status?: VenueStatus;
+}
+
+// ─────────── Venue Hours ───────────
+
+export class HourSlotDto {
+  @IsInt() @Min(0) @Max(6) dayOfWeek!: number; // 0=Chủ nhật .. 6=Thứ 7
+  @IsString() @Matches(/^\d{2}:\d{2}$/) openTime!: string; // "06:00"
+  @IsString() @Matches(/^\d{2}:\d{2}$/) closeTime!: string; // "22:00"
+}
+
+export class UpsertHoursDto {
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => HourSlotDto)
+  hours!: HourSlotDto[];
+}
+
+// ─────────── Venue Images ───────────
+
+export class AddVenueImageDto {
+  @IsString() url!: string;
+  @IsOptional() @IsString() key?: string;
+  @IsOptional() @IsInt() sort?: number;
+  @IsOptional() @IsBoolean() isPrimary?: boolean;
 }

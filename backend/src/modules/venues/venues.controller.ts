@@ -1,9 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { CurrentUser, JwtUser } from '../../common/decorators/current-user.decorator';
 import { Public, Roles } from '../../common/decorators/roles.decorator';
-import { CreateVenueDto, SearchVenuesDto, UpdateVenueDto } from './dto/venue.dto';
+import {
+  CreateVenueDto,
+  SearchVenuesDto,
+  UpdateVenueDto,
+  UpsertHoursDto,
+  AddVenueImageDto,
+} from './dto/venue.dto';
 import { VenuesService } from './venues.service';
 
 @ApiTags('venues')
@@ -56,5 +62,54 @@ export class VenuesController {
   @Post('/admin/:id/reject')
   reject(@Param('id') id: string) {
     return this.venues.reject(id);
+  }
+
+  // ─────────── Venue Hours (7 ngày trong tuần) ───────────
+
+  @Public()
+  @Get(':id/hours')
+  listHours(@Param('id') id: string) {
+    return this.venues.listHours(id);
+  }
+
+  @ApiBearerAuth()
+  @Roles(Role.OWNER, Role.ADMIN, Role.SUPER_ADMIN)
+  @Put('/owner/:id/hours')
+  upsertHours(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpsertHoursDto,
+  ) {
+    return this.venues.upsertHours(id, user.sub, dto.hours);
+  }
+
+  // ─────────── Venue Images ───────────
+
+  @Public()
+  @Get(':id/images')
+  listImages(@Param('id') id: string) {
+    return this.venues.listImages(id);
+  }
+
+  @ApiBearerAuth()
+  @Roles(Role.OWNER, Role.ADMIN, Role.SUPER_ADMIN)
+  @Post('/owner/:id/images')
+  addImage(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: AddVenueImageDto,
+  ) {
+    return this.venues.addImage(id, user.sub, dto);
+  }
+
+  @ApiBearerAuth()
+  @Roles(Role.OWNER, Role.ADMIN, Role.SUPER_ADMIN)
+  @Delete('/owner/:id/images/:imageId')
+  deleteImage(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
+  ) {
+    return this.venues.deleteImage(id, user.sub, imageId);
   }
 }

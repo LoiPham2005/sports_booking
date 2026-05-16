@@ -270,8 +270,12 @@ Thông tin sân thể thao do chủ sân tạo và quản lý.
 | `description` | String? | | Mô tả chi tiết về sân |
 | `addressLine` | String | ✓ | Địa chỉ chi tiết (số nhà, tên đường) |
 | `ward` | String? | | Phường/Xã |
-| `district` | String? | | Quận/Huyện |
-| `city` | String | ✓ | Tỉnh/Thành phố |
+| `district` | String? | | Quận/Huyện (legacy — format trước cải cách 7/2025) |
+| `city` | String | ✓ | Tỉnh/Thành phố user nhập gốc (cũ hoặc mới tuỳ format chọn) |
+| `newCity` | String? | | Tỉnh/TP sau cải cách hành chính 7/2025. Luôn có khi user chọn qua dropdown |
+| `newWard` | String? | | Xã/Phường sau cải cách 7/2025. Dùng cho search chính |
+| `provinceCode` | String? | | Mã hành chính chính thức (vd `79` cho TP.HCM) — theo nguồn openapi.vn |
+| `wardCode` | String? | | Mã xã/phường chính thức (vd `79100`) — dùng để map lookup |
 | `country` | String | ✓ | Quốc gia, mặc định `VN` |
 | `lat` | Decimal? | | Vĩ độ GPS (để hiển thị bản đồ và tìm kiếm gần đây) |
 | `lng` | Decimal? | | Kinh độ GPS |

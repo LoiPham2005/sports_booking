@@ -232,6 +232,7 @@ Chỉ SUPER_ADMIN xem được. Hiển thị badge "SUPER ADMIN" trong header.
 - `tooltip`
 - `skeleton`
 - `toast`/`sonner`
+- `confirm` — confirm dialog dùng chung. Mount `<ConfirmProvider>` ở root (qua `<Providers>` trong [components/providers.tsx](../frontend/src/components/providers.tsx)). API: `const confirm = useConfirm(); const ok = await confirm({ title, description?, confirmText?, cancelText?, tone?, requireText? })`. 4 tone (default/destructive/warning/info) với icon + màu nút phù hợp. Hỗ trợ `requireText` — yêu cầu user gõ chuỗi xác nhận cho action không thể undo.
 - `pagination` — dùng chung cho mọi list/table. Props: `page`, `pageSize`, `total`, `onPageChange`, `onPageSizeChange`, optional `pageSizeOptions` (default `[10, 20, 50, 100]`), `siblingCount` (default 1), `showFirstLast` (default true), `disabled`. Hiển thị `X – Y / Z bản ghi`, dropdown chọn page size, các nút trang với ellipsis `...`. Đã áp dụng tại 8 trang admin/owner/staff (xem [STATUS.md](STATUS.md#test-accounts-seed)).
 
 ### Shared (`components/shared/`)
@@ -241,6 +242,21 @@ Chỉ SUPER_ADMIN xem được. Hiển thị badge "SUPER ADMIN" trong header.
 - `venue-card.tsx`
 - `rating-stars.tsx`
 - `price-tag.tsx`
+
+### Venues (`components/venues/`)
+- `venue-map.tsx` + `venue-map-inner.tsx` — list view dạng map cho `/venues` (OpenStreetMap qua react-leaflet, dynamic import `ssr:false`).
+- `map-picker.tsx` + `map-picker-inner.tsx` — picker để chọn lat/lng (click + drag pin + Geolocation API). Dùng trong form tạo/sửa venue.
+- `address-selector.tsx` — cascading dropdown cho địa chỉ Việt Nam, 2 mode: format cũ (Tỉnh/Quận/Xã) và mới sau 7/2025 (Tỉnh/Xã). Source: `provinces.open-api.vn` cache localStorage 30 ngày qua [lib/vn-address.ts](../frontend/src/lib/vn-address.ts).
+- `hours-editor.tsx` — 7 dòng ngày trong tuần với time inputs + checkbox "Đóng cửa" + nút "Áp dụng giờ T2 cho cả tuần". Gọi `listHours`/`upsertHours` data layer.
+- `images-editor.tsx` — upload multi-file qua Supabase Storage (signed URL từ backend), preview grid với hover hiển thị nút Sao primary + Xoá. Drag-drop placeholder khi rỗng. Max 10MB/ảnh, JPG/PNG/WebP/GIF.
+- `prices-editor.tsx` — chọn sân con từ dropdown → list `PriceRule` + Add/Edit/Delete qua dialog. Day picker 7 nút Cuộn → 7 (CN..T7), time range, giá/slot.
+
+### Supabase Storage upload flow
+1. Frontend gọi `POST /uploads/sign` với `{ kind, contentType, sizeBytes }` → backend tạo signed upload URL qua Supabase SDK.
+2. Frontend `PUT file` thẳng lên `uploadUrl` (Supabase) — backend không bottleneck.
+3. Frontend lấy `publicUrl` rồi gọi `POST /venues/owner/:id/images` để link URL với venue (ghi row `VenueImage`).
+
+Helper: `uploadMedia(file, kind)` trong [lib/data/venues.ts](../frontend/src/lib/data/venues.ts) đóng gói 2 bước (sign + PUT). Mock mode dùng FileReader → data URL để preview offline.
 
 ### Booking (`components/booking/`)
 - `slot-grid.tsx` (grid khung giờ + trạng thái sẵn / đang giữ / đã đặt)

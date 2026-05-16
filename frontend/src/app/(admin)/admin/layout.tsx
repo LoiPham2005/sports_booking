@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Building2,
@@ -17,12 +16,8 @@ import {
   Crown,
   Flag,
   KeyRound,
-  LogOut,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { logout } from '@/lib/data/auth';
-import { isApiError } from '@/lib/api/errors';
-import { useConfirm } from '@/components/ui/confirm';
+import { LogoutButton } from '@/components/shared/logout-button';
 import { cn } from '@/lib/utils';
 
 const NAV = [
@@ -44,28 +39,6 @@ const SUPER_NAV = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const confirm = useConfirm();
-
-  async function handleLogout() {
-    const ok = await confirm({
-      title: 'Đăng xuất khỏi tài khoản?',
-      description: 'Bạn sẽ cần đăng nhập lại để truy cập Admin Portal.',
-      confirmText: 'Đăng xuất',
-      cancelText: 'Ở lại',
-      tone: 'warning',
-    });
-    if (!ok) return;
-    try {
-      await logout();
-    } catch (e) {
-      toast.error(isApiError(e) ? e.message : 'Đăng xuất thất bại');
-      return;
-    }
-    toast.success('Đã đăng xuất');
-    router.replace('/login');
-    router.refresh();
-  }
   return (
     <div className="flex min-h-screen bg-muted/30">
       <aside className="hidden w-64 shrink-0 border-r bg-card lg:flex lg:flex-col">
@@ -143,10 +116,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span className="hidden text-xs text-muted-foreground sm:inline">
               Super Admin · admin@sportsbooking.local
             </span>
-            <Button size="sm" variant="outline" onClick={handleLogout}>
-              <LogOut className="h-3.5 w-3.5" />
-              Đăng xuất
-            </Button>
+            <LogoutButton />
           </div>
         </header>
         <div className="p-6">{children}</div>

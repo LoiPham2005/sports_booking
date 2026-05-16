@@ -68,6 +68,19 @@
 | `city` | string | `city` | `String` | ✅ | |
 | — | — | `country` | `String @default("VN")` | — | UI không cần |
 | — | — | `lat`, `lng` | `Decimal?` | ✅ | Map view dùng — `VenueDto.lat/lng` (number\|null) → `UiVenue.lat/lng` qua `toUiVenue`. Mock data đã có toạ độ HCM thật. Seed backend tạo 7 venue có lat/lng. |
+| — | — | `newCity`, `newWard`, `provinceCode`, `wardCode` | `String?` | 🆕 | Địa chỉ sau cải cách 7/2025. Frontend gửi qua `CreateVenueDto` khi tạo venue qua `<AddressSelector>` cascading dropdown. Backend lưu thẳng các cột này (không JSON). |
+
+## Storage (Supabase)
+
+Backend dùng `@supabase/supabase-js` thay AWS S3 SDK cho upload media. ENV:
+```
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_KEY=<anon-key>
+SUPABASE_BUCKET=sports_booking
+```
+Bucket cần được tạo trong Supabase Dashboard (public read) và RLS cho phép insert. Flow upload signed URL: backend gọi `storage.from(bucket).createSignedUploadUrl(path)` → FE PUT file lên URL đó.
+
+`UploadsService.publicUrl(key)` trả về `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${key}` — URL public không cần signed read.
 | — | — | `phone` | `String?` | 🆕 UI | UI venue detail chưa hiện số ĐT venue |
 | — | — | `status` | `VenueStatus` (DRAFT/PENDING/APPROVED/SUSPENDED) | ⚠️ | UI customer mặc định coi như APPROVED. Owner UI cần hiện badge status, Admin UI đã có flow approve |
 | `rating` | double | `ratingAvg` | `Decimal(2,1)` | 🔄 | Rename + Decimal→number |

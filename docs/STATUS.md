@@ -382,6 +382,20 @@ npx prisma migrate dev --name phase4_owner
 - A11y check
 
 ### ✅ Đã xong gần đây
+- **Venue Hours / Images / Price Rules — full CRUD** — `/owner/venues/[id]` 3 tab cuối giờ wire backend đầy đủ:
+  - **Bảng giá**: chọn sân → list/add/edit/delete `PriceRule` qua dialog. Backend mới: `PATCH /owner/price-rules/:id`, `DELETE /owner/price-rules/:id`.
+  - **Ảnh**: upload qua **Supabase Storage** với signed URL từ backend, preview grid + xoá. Backend mới: `GET/POST/DELETE /venues/:id/images` (link tới bảng `VenueImage`).
+  - **Giờ mở cửa**: 7 ngày trong tuần với time inputs + checkbox "Đóng cửa" + nút "Áp dụng giờ T2 cho cả tuần". Backend mới: `GET /venues/:id/hours`, `PUT /venues/owner/:id/hours` (replace toàn bộ).
+  - Refactor `UploadsService` từ AWS S3 SDK sang `@supabase/supabase-js` — dùng signed upload URL, FE upload thẳng lên Supabase Storage bucket `sports_booking`, backend chỉ ghi `MediaAsset` row + URL public.
+  - 3 component dùng chung trong `components/venues/`: `hours-editor.tsx`, `images-editor.tsx`, `prices-editor.tsx`.
+- **Owner Venue CRUD + Courts CRUD** — [/owner/venues](../frontend/src/app/(owner)/owner/venues/page.tsx) (list + pagination), [/owner/venues/new](../frontend/src/app/(owner)/owner/venues/new/page.tsx) (form full page với map picker + cascading dropdown địa chỉ), [/owner/venues/[id]](../frontend/src/app/(owner)/owner/venues/[id]/page.tsx) (tabs: Thông tin/Sân con + CRUD courts qua Dialog). Backend: `POST /venues/owner`, `PATCH /venues/owner/:id`, `GET /venues/:id/courts`, `POST/PATCH/DELETE /owner/courts/*` — đã có sẵn.
+- **Cascading Address Selector** — [components/venues/address-selector.tsx](../frontend/src/components/venues/address-selector.tsx) dùng `provinces.open-api.vn` (cache localStorage 30 ngày). 2 mode: format cũ (Tỉnh → Quận/Huyện → Xã) và mới sau cải cách 7/2025 (Tỉnh → Xã, flatten qua huyện). Auto-convert old → new khi user chọn đủ.
+- **Map Picker (OpenStreetMap)** — [components/venues/map-picker.tsx](../frontend/src/components/venues/map-picker.tsx) click để chọn lat/lng, kéo pin tinh chỉnh, nút "Vị trí của tôi" qua Geolocation API.
+- **Schema địa chỉ mới** — Venue có thêm `newCity`, `newWard`, `provinceCode`, `wardCode` (cột rõ ràng thay vì JSON, index nhanh). Giữ `city/district/ward` legacy để search backward-compat.
+- **Confirm Dialog dùng chung** — [components/ui/confirm.tsx](../frontend/src/components/ui/confirm.tsx) với `useConfirm()` hook + provider ở root. 4 tone (default/destructive/warning/info), hỗ trợ `requireText` cho action nguy hiểm. Đã thay `window.confirm` trong admin logout, court delete.
+- **Logout button** — Admin layout có nút Đăng xuất + confirm + call `POST /auth/logout` qua data layer [lib/data/auth.ts](../frontend/src/lib/data/auth.ts) (mock-aware).
+- **Toast position** — đổi từ `top-center` → `top-right` ở root layout.
+- **Backend scripts mở rộng** — thêm `dev`, `db:push`, `db:seed`, `typecheck`, `format:check`, `lint:check`, `test:cov` vào [backend/package.json](../backend/package.json).
 - **Pagination dùng chung** — [components/ui/pagination.tsx](../frontend/src/components/ui/pagination.tsx). Hỗ trợ chọn page size (10/20/50/100), điều hướng trang với ellipsis, nút first/last, hiển thị "X – Y / Z bản ghi". Đã tích hợp client-side slice (mock + API đều OK) tại:
   - **Admin**: `/admin/users`, `/admin/audit`, `/admin/venues`, `/admin/vouchers`, `/admin/disputes`
   - **Owner**: `/owner/bookings`, `/owner/payout` (history), `/owner/staff`

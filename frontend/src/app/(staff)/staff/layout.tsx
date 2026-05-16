@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { LogOut, MapPin, Shield, Crown } from 'lucide-react';
+import { MapPin, Shield, Crown } from 'lucide-react';
+import { LogoutButton } from '@/components/shared/logout-button';
 import { useStaffRole, withRole } from '@/lib/use-staff-role';
 import { Suspense } from 'react';
 
@@ -80,11 +80,7 @@ function StaffLayoutInner({ children }: { children: React.ReactNode }) {
             <Avatar className="h-9 w-9">
               <AvatarFallback>{isManager ? 'M' : 'S'}</AvatarFallback>
             </Avatar>
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/login">
-                <LogOut className="h-4 w-4" /> Đăng xuất
-              </Link>
-            </Button>
+            <LogoutButton variant="ghost" iconOnlyOnMobile />
           </div>
         </div>
 

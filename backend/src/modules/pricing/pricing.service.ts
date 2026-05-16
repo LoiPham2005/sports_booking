@@ -137,4 +137,23 @@ export class PricingService {
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     });
   }
+
+  async updateRule(id: string, ownerId: string, dto: CreatePriceRuleDto) {
+    const rule = await this.prisma.priceRule.findUniqueOrThrow({
+      where: { id },
+      include: { court: { select: { venueId: true } } },
+    });
+    await this.venues.assertOwner(rule.court.venueId, ownerId);
+    return this.prisma.priceRule.update({ where: { id }, data: { ...dto } });
+  }
+
+  async deleteRule(id: string, ownerId: string) {
+    const rule = await this.prisma.priceRule.findUniqueOrThrow({
+      where: { id },
+      include: { court: { select: { venueId: true } } },
+    });
+    await this.venues.assertOwner(rule.court.venueId, ownerId);
+    await this.prisma.priceRule.delete({ where: { id } });
+    return { ok: true };
+  }
 }

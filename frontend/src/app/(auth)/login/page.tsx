@@ -20,15 +20,10 @@ function LoginInner() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!identifier || !password) {
-      toast.error('Vui lòng nhập đủ thông tin');
-      return;
-    }
+  async function login(id: string, pwd: string) {
     setSubmitting(true);
     try {
-      const result = await authApi.login({ identifier, password });
+      const result = await authApi.login({ identifier: id, password: pwd });
       toast.success(`Xin chào, ${result.user.fullName}`);
       router.replace(nextPath || homePathByRole(result.user.role));
       router.refresh();
@@ -38,6 +33,26 @@ function LoginInner() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!identifier || !password) {
+      toast.error('Vui lòng nhập đủ thông tin');
+      return;
+    }
+    await login(identifier, password);
+  }
+
+  function quickLogin(account: SeedAccount) {
+    setIdentifier(account.email);
+    setPassword(account.password);
+    if (USE_MOCK) {
+      // Mock mode — chỉ điền form, user nhấn Đăng nhập (vì mock chấp nhận mọi credential)
+      router.replace(account.path);
+      return;
+    }
+    void login(account.email, account.password);
   }
 
   return (
@@ -106,10 +121,62 @@ function LoginInner() {
         </Link>
       </p>
 
-      {USE_MOCK && <DemoChips />}
+      <DemoChips onPick={quickLogin} disabled={submitting} />
     </div>
   );
 }
+
+interface SeedAccount {
+  email: string;
+  password: string;
+  label: string;
+  icon: string;
+  color: string;
+  path: string;
+}
+
+const SEED_ACCOUNTS: SeedAccount[] = [
+  {
+    email: 'customer@gmail.com',
+    password: '12345678',
+    label: 'Customer',
+    icon: '👤',
+    color: 'text-primary hover:border-primary hover:bg-primary/5',
+    path: '/',
+  },
+  {
+    email: 'owner@gmail.com',
+    password: '12345678',
+    label: 'Owner',
+    icon: '🏟️',
+    color: 'text-accent hover:border-accent hover:bg-accent/5',
+    path: '/owner',
+  },
+  {
+    email: 'staff@gmail.com',
+    password: '12345678',
+    label: 'Staff',
+    icon: '🔧',
+    color: 'text-orange-500 hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/20',
+    path: '/staff',
+  },
+  {
+    email: 'manager@gmail.com',
+    password: '12345678',
+    label: 'Manager',
+    icon: '👑',
+    color: 'text-violet-500 hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/20',
+    path: '/staff?role=manager',
+  },
+  {
+    email: 'admin@gmail.com',
+    password: '12345678',
+    label: 'Admin',
+    icon: '⚡',
+    color: 'text-purple-500 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20',
+    path: '/admin',
+  },
+];
 
 export default function LoginPage() {
   return (
@@ -119,53 +186,42 @@ export default function LoginPage() {
   );
 }
 
-/** Demo chip switcher — chỉ hiện khi USE_MOCK=true. Phase 1 mới kết: nối API thật. */
-function DemoChips() {
+/**
+ * Demo chip switcher — click 1 phát login luôn bằng seed account.
+ * - Mock mode: chỉ redirect (mock auth không cần credential)
+ * - API mode: call POST /auth/login với credential thật từ `prisma/seed.ts`
+ */
+function DemoChips({ onPick, disabled }: { onPick: (a: SeedAccount) => void; disabled: boolean }) {
   return (
     <div className="rounded-xl border border-dashed bg-muted/40 p-4">
       <div className="mb-3 flex items-center gap-2">
         <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent">
-          Demo (mock)
+          Demo
         </span>
         <span className="text-sm font-semibold">Đăng nhập nhanh theo role</span>
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {USE_MOCK ? 'mock — chuyển trang' : 'gọi API thật'}
+        </span>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        <Link
-          href="/"
-          className="rounded-md border bg-background p-3 text-center transition-all hover:border-primary hover:bg-primary/5"
-        >
-          <div className="text-xl">👤</div>
-          <div className="mt-1 text-xs font-bold text-primary">Customer</div>
-        </Link>
-        <Link
-          href="/owner"
-          className="rounded-md border bg-background p-3 text-center transition-all hover:border-accent hover:bg-accent/5"
-        >
-          <div className="text-xl">🏟️</div>
-          <div className="mt-1 text-xs font-bold text-accent">Owner</div>
-        </Link>
-        <Link
-          href="/staff"
-          className="rounded-md border bg-background p-3 text-center transition-all hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/20"
-        >
-          <div className="text-xl">🔧</div>
-          <div className="mt-1 text-xs font-bold text-orange-500">Staff</div>
-        </Link>
-        <Link
-          href="/staff?role=manager"
-          className="rounded-md border bg-background p-3 text-center transition-all hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/20"
-        >
-          <div className="text-xl">👑</div>
-          <div className="mt-1 text-xs font-bold text-violet-500">Manager</div>
-        </Link>
-        <Link
-          href="/admin"
-          className="rounded-md border bg-background p-3 text-center transition-all hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-        >
-          <div className="text-xl">⚡</div>
-          <div className="mt-1 text-xs font-bold text-purple-500">Admin</div>
-        </Link>
+        {SEED_ACCOUNTS.map((a) => (
+          <button
+            key={a.email}
+            type="button"
+            onClick={() => onPick(a)}
+            disabled={disabled}
+            className={`rounded-md border bg-background p-3 text-center transition-all disabled:cursor-not-allowed disabled:opacity-50 ${a.color}`}
+          >
+            <div className="text-xl">{a.icon}</div>
+            <div className={`mt-1 text-xs font-bold ${a.color.split(' ')[0]}`}>{a.label}</div>
+          </button>
+        ))}
       </div>
+      {!USE_MOCK && (
+        <p className="mt-2 text-[10px] text-muted-foreground">
+          Cần seed DB trước: <code className="rounded bg-muted px-1">npm run db:seed</code>
+        </p>
+      )}
     </div>
   );
 }
