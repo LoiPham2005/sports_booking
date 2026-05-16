@@ -22,7 +22,7 @@ import {
   type PriceRuleInput,
 } from '@/lib/api/endpoints/venues';
 import { sportsApi } from '@/lib/api/endpoints/sports';
-import { toUiVenue, toUiSport, type UiVenue, type UiSport, type UiCourt } from '@/lib/api/adapters/venue';
+import { toUiVenue, type UiVenue, type UiSport, type UiCourt } from '@/lib/api/adapters/venue';
 import { VENUES, SPORTS, COURTS, SURFACES } from '@/lib/mock-data';
 
 // ─────────── Mock → UI adapters ───────────
@@ -318,10 +318,33 @@ export async function listPriceRules(courtId: string): Promise<PriceRuleDto[]> {
   return venuesApi.listPriceRules(courtId);
 }
 
+function assertNoOverlapMock(
+  list: PriceRuleDto[],
+  body: PriceRuleInput,
+  excludeId: string | null,
+) {
+  if (body.startTime >= body.endTime) {
+    throw new Error('Giờ kết thúc phải sau giờ bắt đầu');
+  }
+  const conflict = list.find(
+    (r) =>
+      r.id !== excludeId &&
+      r.dayOfWeek === body.dayOfWeek &&
+      body.startTime < r.endTime &&
+      body.endTime > r.startTime,
+  );
+  if (conflict) {
+    throw new Error(
+      `Khung giờ trùng với rule ${conflict.startTime}–${conflict.endTime} đã có. Sửa hoặc xoá rule cũ trước.`,
+    );
+  }
+}
+
 export async function addPriceRule(courtId: string, body: PriceRuleInput): Promise<PriceRuleDto> {
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 150));
     const list = (await listPriceRules(courtId)).slice();
+    assertNoOverlapMock(list, body, null);
     const created: PriceRuleDto = { id: `${courtId}-r-${Date.now()}`, courtId, ...body };
     list.push(created);
     mockPriceRulesByCourt.set(courtId, list);
@@ -338,6 +361,7 @@ export async function updatePriceRule(
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 150));
     const list = (await listPriceRules(courtId)).slice();
+    assertNoOverlapMock(list, body, id);
     const idx = list.findIndex((r) => r.id === id);
     if (idx === -1) throw new Error('Price rule not found');
     list[idx] = { ...list[idx], ...body };

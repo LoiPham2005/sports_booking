@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Role, VenueStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { CreateVenueDto, SearchVenuesDto, UpdateVenueDto } from './dto/venue.dto';
 
 /**
@@ -48,7 +49,10 @@ const venueDetailInclude = {
 
 @Injectable()
 export class VenuesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private uploads: UploadsService,
+  ) {}
 
   async search(dto: SearchVenuesDto) {
     const where: Prisma.VenueWhereInput = {
@@ -222,6 +226,7 @@ export class VenuesService {
       data: {
         venueId,
         url: dto.url,
+        key: dto.key,
         sort: dto.sort ?? current,
         isPrimary: dto.isPrimary ?? current === 0, // ảnh đầu auto-primary
       },
@@ -232,6 +237,12 @@ export class VenuesService {
     await this.assertOwner(venueId, ownerId);
     const img = await this.prisma.venueImage.findFirst({ where: { id: imageId, venueId } });
     if (!img) return { ok: true };
+    // Xoá file thật trên Supabase Storage trước (nếu có key)
+    if (img.key) {
+      await this.uploads.remove(img.key).catch(() => {
+        // Log nhưng vẫn cho xoá DB row — tránh kẹt nếu Supabase không reach được
+      });
+    }
     await this.prisma.venueImage.delete({ where: { id: imageId } });
     return { ok: true };
   }

@@ -292,15 +292,16 @@ Thông tin sân thể thao do chủ sân tạo và quản lý.
 
 ## VenueImage
 
-Ảnh của sân thể thao.
+Ảnh **và video** của sân thể thao. Render `<video>` vs `<img>` ở frontend dựa trên đuôi file trong `url`.
 
 | Thuộc tính | Kiểu | Bắt buộc | Mô tả |
 |---|---|---|---|
 | `id` | String (cuid) | ✓ | Khóa chính |
 | `venueId` | String | ✓ | ID sân sở hữu ảnh này |
-| `url` | String | ✓ | Đường dẫn ảnh (URL S3/CDN) |
+| `url` | String | ✓ | URL public (Supabase Storage `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${key}`) |
+| `key` | String? | | Object path trong Supabase Storage (vd `venue/2026/<uuid>.jpg`). Null cho URL ngoài. Backend dùng để xoá file thật khi delete record |
 | `sort` | Int | ✓ | Thứ tự hiển thị, mặc định 0 |
-| `isPrimary` | Boolean | ✓ | Có phải ảnh đại diện của sân không |
+| `isPrimary` | Boolean | ✓ | Có phải ảnh đại diện của sân không. Khi set true → các ảnh khác cùng venue tự un-set. Ảnh đầu tiên thêm vào auto-primary |
 
 ---
 

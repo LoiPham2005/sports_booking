@@ -382,6 +382,12 @@ npx prisma migrate dev --name phase4_owner
 - A11y check
 
 ### ✅ Đã xong gần đây
+- **Upload ảnh + video tách section** — [images-editor.tsx](../frontend/src/components/venues/images-editor.tsx) refactor thành 3 khối: section "Ảnh" + section "Video" + grid "Đã tải lên". Mỗi section có staging area: chọn file → preview local (qua `URL.createObjectURL`) → click button **"Tải lên (n)"** mới gọi API. Validate type/size client-side trước khi gửi. Video render qua `<video controls>` cho phép play inline.
+- **Auto-create Supabase bucket** — `UploadsService.ensureBucket()` chạy 1 lần ở lần upload đầu: gọi `getBucket()` check trước, nếu chưa tồn tại thì `createBucket({ public: true, fileSizeLimit: 50MB })`. Yêu cầu `service_role` key (anon không có quyền tạo bucket).
+- **Xoá ảnh/video xoá luôn file trên Supabase** — Schema `VenueImage` thêm field `key String?` để track object path. Khi `deleteImage`: backend gọi `supabase.storage.remove([key])` trước, sau đó mới xoá DB row. Lỗi remove Supabase được catch để không kẹt nếu storage không reach được.
+- **Court update không cho đổi sportId** — `UpdateCourtDto` backend không có sportId; frontend strip field này khi gửi `PATCH /owner/courts/:id` + dropdown môn thể thao bị disable khi edit (có note giải thích).
+- **Logout button dùng chung** — [components/shared/logout-button.tsx](../frontend/src/components/shared/logout-button.tsx) tái sử dụng cho admin/owner/staff layout. Confirm dialog → call `POST /auth/logout` qua data layer → redirect /login. Fix backend `RefreshDto.refreshToken` thành optional để logout không lỗi 400 khi không gửi body.
+- **Quick-login chips ở /login** — 5 chip role (Customer/Owner/Staff/Manager/Admin) click 1 phát login bằng credential seed. API mode call `POST /auth/login` thật; mock mode chỉ redirect. Badge ở góc phải báo mode hiện tại.
 - **Venue Hours / Images / Price Rules — full CRUD** — `/owner/venues/[id]` 3 tab cuối giờ wire backend đầy đủ:
   - **Bảng giá**: chọn sân → list/add/edit/delete `PriceRule` qua dialog. Backend mới: `PATCH /owner/price-rules/:id`, `DELETE /owner/price-rules/:id`.
   - **Ảnh**: upload qua **Supabase Storage** với signed URL từ backend, preview grid + xoá. Backend mới: `GET/POST/DELETE /venues/:id/images` (link tới bảng `VenueImage`).

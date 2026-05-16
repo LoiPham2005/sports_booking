@@ -248,15 +248,21 @@ Chỉ SUPER_ADMIN xem được. Hiển thị badge "SUPER ADMIN" trong header.
 - `map-picker.tsx` + `map-picker-inner.tsx` — picker để chọn lat/lng (click + drag pin + Geolocation API). Dùng trong form tạo/sửa venue.
 - `address-selector.tsx` — cascading dropdown cho địa chỉ Việt Nam, 2 mode: format cũ (Tỉnh/Quận/Xã) và mới sau 7/2025 (Tỉnh/Xã). Source: `provinces.open-api.vn` cache localStorage 30 ngày qua [lib/vn-address.ts](../frontend/src/lib/vn-address.ts).
 - `hours-editor.tsx` — 7 dòng ngày trong tuần với time inputs + checkbox "Đóng cửa" + nút "Áp dụng giờ T2 cho cả tuần". Gọi `listHours`/`upsertHours` data layer.
-- `images-editor.tsx` — upload multi-file qua Supabase Storage (signed URL từ backend), preview grid với hover hiển thị nút Sao primary + Xoá. Drag-drop placeholder khi rỗng. Max 10MB/ảnh, JPG/PNG/WebP/GIF.
+- `images-editor.tsx` — 3 section: **Ảnh** (max 10MB, JPG/PNG/WebP/GIF) + **Video** (max 50MB, MP4/MOV) + **Đã tải lên** (grid hiển thị tất cả). Mỗi section có staging area: chọn file → preview local → click "Tải lên (n)" mới gửi server. Hover thumb trong grid Đã tải lên: nút Sao (đặt primary) + Xoá (xoá file thật trên Supabase Storage qua `key` field).
 - `prices-editor.tsx` — chọn sân con từ dropdown → list `PriceRule` + Add/Edit/Delete qua dialog. Day picker 7 nút Cuộn → 7 (CN..T7), time range, giá/slot.
 
 ### Supabase Storage upload flow
-1. Frontend gọi `POST /uploads/sign` với `{ kind, contentType, sizeBytes }` → backend tạo signed upload URL qua Supabase SDK.
-2. Frontend `PUT file` thẳng lên `uploadUrl` (Supabase) — backend không bottleneck.
-3. Frontend lấy `publicUrl` rồi gọi `POST /venues/owner/:id/images` để link URL với venue (ghi row `VenueImage`).
+1. Frontend gọi `POST /uploads/sign` với `{ kind, contentType, sizeBytes }`.
+2. Backend `UploadsService.sign()`:
+   - `ensureBucket()` — lần đầu sẽ tự `createBucket({ public: true, fileSizeLimit: 50MB })` nếu bucket `SUPABASE_BUCKET` chưa tồn tại (cần `service_role` key)
+   - Tạo signed upload URL qua `storage.from(bucket).createSignedUploadUrl(path)` (TTL 5 phút)
+3. Frontend `PUT file` thẳng lên `uploadUrl` (Supabase) — backend không bottleneck với file lớn.
+4. Frontend lấy `{ url, key }` rồi gọi `POST /venues/owner/:id/images` để link với venue. Backend lưu cả `url` + `key` trong `VenueImage`.
+5. Khi xoá: `DELETE /venues/owner/:id/images/:imageId` → backend gọi `supabase.storage.remove([key])` rồi xoá DB row.
 
 Helper: `uploadMedia(file, kind)` trong [lib/data/venues.ts](../frontend/src/lib/data/venues.ts) đóng gói 2 bước (sign + PUT). Mock mode dùng FileReader → data URL để preview offline.
+
+ENV backend cần: `SUPABASE_URL`, `SUPABASE_KEY` (**service_role** secret, không phải anon), `SUPABASE_BUCKET` (mặc định `sports_booking`).
 
 ### Booking (`components/booking/`)
 - `slot-grid.tsx` (grid khung giờ + trạng thái sẵn / đang giữ / đã đặt)

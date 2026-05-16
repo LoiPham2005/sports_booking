@@ -304,6 +304,8 @@ model VenueImage {
   id        String  @id @default(cuid())
   venueId   String
   url       String
+  /// Supabase Storage object key — null cho ảnh URL ngoài. Dùng để xoá file thật trên storage khi delete record.
+  key       String?
   sort      Int     @default(0)
   isPrimary Boolean @default(false)
 

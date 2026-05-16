@@ -111,9 +111,41 @@ export class PricingService {
   async addRule(courtId: string, ownerId: string, dto: CreatePriceRuleDto) {
     const court = await this.prisma.court.findUniqueOrThrow({ where: { id: courtId } });
     await this.venues.assertOwner(court.venueId, ownerId);
+    await this.assertNoOverlap(courtId, dto, null);
     return this.prisma.priceRule.create({
       data: { courtId, ...dto },
     });
+  }
+
+  /**
+   * Check khung giờ mới không trùng với rule nào đang tồn tại của cùng court + dayOfWeek.
+   * 2 khung giờ trùng = `startA < endB` AND `endA > startB` (half-open interval [start, end)).
+   * `excludeId` để skip chính rule đang update.
+   */
+  private async assertNoOverlap(
+    courtId: string,
+    dto: { dayOfWeek: number; startTime: string; endTime: string },
+    excludeId: string | null,
+  ) {
+    if (dto.startTime >= dto.endTime) {
+      throw new BadRequestException('Giờ kết thúc phải sau giờ bắt đầu');
+    }
+    const existing = await this.prisma.priceRule.findMany({
+      where: {
+        courtId,
+        dayOfWeek: dto.dayOfWeek,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: { id: true, startTime: true, endTime: true },
+    });
+    const conflict = existing.find(
+      (r) => dto.startTime < r.endTime && dto.endTime > r.startTime,
+    );
+    if (conflict) {
+      throw new BadRequestException(
+        `Khung giờ trùng với rule ${conflict.startTime}–${conflict.endTime} đã có. Sửa hoặc xoá rule cũ trước.`,
+      );
+    }
   }
 
   async addOverride(courtId: string, ownerId: string, dto: CreatePriceOverrideDto) {
@@ -144,6 +176,7 @@ export class PricingService {
       include: { court: { select: { venueId: true } } },
     });
     await this.venues.assertOwner(rule.court.venueId, ownerId);
+    await this.assertNoOverlap(rule.courtId, dto, id);
     return this.prisma.priceRule.update({ where: { id }, data: { ...dto } });
   }
 

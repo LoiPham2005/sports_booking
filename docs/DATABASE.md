@@ -91,9 +91,11 @@ Index:
 - GIN (searchVector) cho FTS.
 
 ### VenueImage
-- `{ id, venueId, url, sort, isPrimary }`
+- `{ id, venueId, url, key?, sort, isPrimary }`
+- `key` là object path trong Supabase Storage (vd `venue/2026/uuid.jpg`). Null cho URL ngoài. Backend dùng để xoá file thật khi `DELETE /venues/owner/:id/images/:imageId`.
 - Khi `isPrimary=true` qua API → các ảnh khác cùng venue tự bị `isPrimary=false`. Ảnh đầu tiên thêm vào sẽ auto-primary.
-- URL public từ Supabase Storage public bucket: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${key}`.
+- URL public: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${key}` (bucket public, không cần signed read).
+- VenueImage cũng dùng để lưu **video** (URL có đuôi `.mp4`/`.mov` → frontend render `<video>` thay vì `<img>`).
 
 ### Amenity / VenueAmenity
 - `Amenity { id, slug, nameVi, nameEn, icon }` — danh mục.
