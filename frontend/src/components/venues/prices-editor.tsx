@@ -351,11 +351,11 @@ export function PricesEditor({ courts }: { courts: UiCourt[] }) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Giờ bắt đầu</Label>
-                <TimePicker24 value={startTime} onChange={setStartTime} />
+                <TimePicker24 value={startTime} onChange={setStartTime} className="w-full" />
               </div>
               <div className="space-y-1.5">
                 <Label>Giờ kết thúc</Label>
-                <TimePicker24 value={endTime} onChange={setEndTime} />
+                <TimePicker24 value={endTime} onChange={setEndTime} className="w-full" />
               </div>
             </div>
 
