@@ -66,9 +66,10 @@
 **Admin** (7 pages):
 - `/admin` overview, `/admin/venues` approval, `/admin/users`, `/admin/disputes`, `/admin/vouchers`, `/admin/reports`, `/admin/audit`
 
-**Super Admin** (3 pages):
+**Super Admin** (4 pages):
 - `/admin/system/settings` (commission %, cancel policy)
 - `/admin/system/roles` (promote/demote admin)
+- `/admin/system/permissions` (matrix tích chọn permission × role, lưu theo từng role)
 - `/admin/system/feature-flags` (per env toggle)
 
 ### ⏳ Chưa làm

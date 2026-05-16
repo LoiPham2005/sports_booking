@@ -750,3 +750,30 @@ model FeatureFlag {
   updatedAt   DateTime @updatedAt
   updatedBy   String?
 }
+
+// ============================================================
+// ROLE-BASED PERMISSIONS (động — admin tích chọn qua UI)
+// ============================================================
+model Permission {
+  id          String   @id @default(cuid())
+  key         String   @unique // e.g., "venue.approve"
+  category    String           // nhóm hiển thị: Venue, Booking, ...
+  description String
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+
+  @@index([category])
+}
+
+model RolePermission {
+  role         Role
+  permissionId String
+  grantedBy    String?
+  createdAt    DateTime @default(now())
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([role, permissionId])
+  @@index([role])
+}

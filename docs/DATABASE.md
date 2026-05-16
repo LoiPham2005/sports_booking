@@ -249,6 +249,12 @@ Unique: (provider, externalEventId).
 ### AuditLog
 - `{ id, actorId, actorRole, action, resourceType, resourceId, beforeJson?, afterJson?, ip, userAgent, createdAt }`
 
+### Permission / RolePermission (RBAC động)
+- `Permission { id, key (unique, vd: "venue.approve"), category, description, createdAt }`
+- `RolePermission { role, permissionId, grantedBy?, createdAt }` — composite PK `(role, permissionId)`.
+- Seed 23 permission mặc định lần đầu khi gọi `GET /system/permissions`. SUPER_ADMIN tự động có toàn bộ; ADMIN có 18 quyền vận hành mặc định.
+- Guard `PermissionsGuard` + decorator `@RequirePermission('key')` để check runtime. SUPER_ADMIN bypass.
+
 ## Quy ước index quan trọng
 
 - Mọi FK → index.

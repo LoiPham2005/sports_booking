@@ -6,6 +6,7 @@ import {
   systemApi,
   type AdminUserListItem,
   type FeatureFlagDto,
+  type PermissionMatrixDto,
   type SystemSettings,
   type UpdateSettingsInput,
 } from '@/lib/api/endpoints/system';
@@ -138,4 +139,44 @@ export async function updateFeatureFlag(
     return;
   }
   await systemApi.updateFlag(key, body);
+}
+
+// ─────── Permissions ───────
+
+const MOCK_MATRIX: PermissionMatrixDto = {
+  roles: ['CUSTOMER', 'OWNER', 'STAFF', 'ADMIN', 'SUPER_ADMIN'],
+  permissions: [
+    { id: 'p1', key: 'venue.approve', category: 'Venue', description: 'Duyệt venue do owner nộp' },
+    { id: 'p2', key: 'venue.reject', category: 'Venue', description: 'Từ chối venue' },
+    { id: 'p3', key: 'venue.suspend', category: 'Venue', description: 'Đình chỉ venue' },
+    { id: 'p4', key: 'user.suspend', category: 'User', description: 'Khóa tài khoản user' },
+    { id: 'p5', key: 'voucher.create', category: 'Voucher', description: 'Tạo voucher mới' },
+    { id: 'p6', key: 'report.view', category: 'Report', description: 'Xem báo cáo doanh thu, GMV' },
+    { id: 'p7', key: 'audit.view', category: 'Audit', description: 'Xem audit log' },
+  ],
+  grants: {
+    CUSTOMER: [],
+    OWNER: [],
+    STAFF: [],
+    ADMIN: ['venue.approve', 'venue.reject', 'venue.suspend', 'user.suspend', 'voucher.create', 'report.view', 'audit.view'],
+    SUPER_ADMIN: ['venue.approve', 'venue.reject', 'venue.suspend', 'user.suspend', 'voucher.create', 'report.view', 'audit.view'],
+  },
+};
+let mockMatrixState: PermissionMatrixDto = JSON.parse(JSON.stringify(MOCK_MATRIX));
+
+export async function getPermissionMatrix(): Promise<PermissionMatrixDto> {
+  if (USE_MOCK) return mockMatrixState;
+  return systemApi.getPermissionMatrix();
+}
+
+export async function updateRolePermissions(role: Role, keys: string[]): Promise<PermissionMatrixDto> {
+  if (USE_MOCK) {
+    if (role === 'SUPER_ADMIN') throw new Error('Cannot modify SUPER_ADMIN permissions');
+    mockMatrixState = {
+      ...mockMatrixState,
+      grants: { ...mockMatrixState.grants, [role]: [...keys] },
+    };
+    return mockMatrixState;
+  }
+  return systemApi.updateRolePermissions(role, keys);
 }

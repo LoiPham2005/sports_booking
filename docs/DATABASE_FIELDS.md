@@ -34,6 +34,8 @@
 - [AuditLog — Nhật ký hệ thống](#auditlog)
 - [SystemSetting — Cài đặt hệ thống](#systemsetting)
 - [FeatureFlag — Cờ tính năng](#featureflag)
+- [Permission — Danh mục quyền](#permission)
+- [RolePermission — Gán quyền cho role](#rolepermission)
 
 ---
 
@@ -732,3 +734,34 @@ Bật/tắt tính năng trong hệ thống mà không cần deploy lại (featur
 | `description` | String? | | Mô tả tính năng này làm gì |
 | `updatedAt` | DateTime | ✓ | Thời điểm cập nhật gần nhất |
 | `updatedBy` | String? | | ID admin cập nhật |
+
+---
+
+## Permission
+
+Danh mục các quyền chi tiết (granular permission) mà admin có thể tích chọn gán cho từng role qua UI.
+
+| Thuộc tính | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `id` | String (cuid) | ✓ | Khóa chính |
+| `key` | String | ✓ | Định danh quyền duy nhất, dạng `domain.action` (VD: `venue.approve`, `booking.refund`) |
+| `category` | String | ✓ | Nhóm hiển thị trên UI (VD: `Venue`, `Booking`, `User`, `System`) |
+| `description` | String | ✓ | Mô tả tiếng Việt giải thích quyền này làm gì |
+| `createdAt` | DateTime | ✓ | Thời điểm tạo |
+
+Lần đầu gọi `GET /system/permissions` sẽ tự động seed 23 permission mặc định. Code chỉ check theo `key` nên không được đổi key đã tồn tại (sẽ làm mất grant).
+
+---
+
+## RolePermission
+
+Bảng trung gian gán quyền cho từng role (quan hệ nhiều-nhiều giữa `Role` enum và `Permission`).
+
+| Thuộc tính | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `role` | Role | ✓ | Role được gán (CUSTOMER/OWNER/STAFF/ADMIN/SUPER_ADMIN) |
+| `permissionId` | String | ✓ | ID quyền được gán |
+| `grantedBy` | String? | | ID SUPER_ADMIN cập nhật grant này |
+| `createdAt` | DateTime | ✓ | Thời điểm cấp quyền |
+
+Khóa chính là tổ hợp `(role, permissionId)`. SUPER_ADMIN mặc định có toàn bộ quyền và không thể sửa qua API (chống tự khóa hệ thống).

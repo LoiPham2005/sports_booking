@@ -64,13 +64,20 @@ Tài liệu liệt kê đầy đủ chức năng của backend (NestJS). Mỗi m
 ## 3. Roles & Permissions
 
 - Roles: `CUSTOMER`, `OWNER` (chủ sân), `STAFF` (nhân viên), `ADMIN`, `SUPER_ADMIN`.
-- RBAC bằng `@Roles()` + `RolesGuard`.
+- RBAC role-based bằng `@Roles()` + `RolesGuard` (vào theo role).
+- **Permission-based (động)**: bảng `Permission` + `RolePermission` cho phép SUPER_ADMIN bật/tắt quyền chi tiết cho từng role qua UI mà không cần deploy lại.
+  - Guard: `@RequirePermission('key')` + `PermissionsGuard`.
+  - SUPER_ADMIN luôn pass mọi permission check; không cho phép sửa permission của SUPER_ADMIN từ UI để tránh tự khóa.
+  - 23 permission mặc định seed lần đầu (Venue/Booking/User/Voucher/Payout/Dispute/Report/Audit/System).
 - OWNER chỉ thao tác được trên Venue mà họ sở hữu (scope guard).
 - STAFF được OWNER cấp quyền theo từng venue (`VenueMember` table).
 
 ### Endpoint
 - `POST /owner/apply` — user gửi đơn xin lên OWNER (kèm giấy tờ).
 - `POST /admin/owners/:id/approve` & `/reject` — admin duyệt.
+- `GET /system/permissions` — list toàn bộ permission (auto-seed lần đầu).
+- `GET /system/permissions/matrix` — trả về `{ roles, permissions, grants }` để render bảng tích chọn.
+- `PUT /system/permissions/:role` — body `{ keys: string[] }`, replace toàn bộ permission của role. Ghi `AuditLog` với action `ROLE_PERMISSIONS_UPDATE`. **SUPER_ADMIN only**.
 
 ## 4. Sports & Categories
 

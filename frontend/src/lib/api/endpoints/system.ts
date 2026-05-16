@@ -1,4 +1,4 @@
-import { apiGet, apiPatch } from '../client';
+import { apiGet, apiPatch, apiPut } from '../client';
 import type { Role, UserStatus } from '../types';
 
 export interface SystemSettings {
@@ -34,6 +34,19 @@ export interface FeatureFlagDto {
   updatedBy: string | null;
 }
 
+export interface PermissionDto {
+  id: string;
+  key: string;
+  category: string;
+  description: string;
+}
+
+export interface PermissionMatrixDto {
+  roles: Role[];
+  permissions: PermissionDto[];
+  grants: Record<Role, string[]>;
+}
+
 export const systemApi = {
   getSettings: () => apiGet<SystemSettings>('/system/settings'),
   updateSettings: (body: UpdateSettingsInput) =>
@@ -46,4 +59,10 @@ export const systemApi = {
   listFlags: () => apiGet<FeatureFlagDto[]>('/system/feature-flags'),
   updateFlag: (key: string, body: { enabled: boolean; description?: string }) =>
     apiPatch<FeatureFlagDto>(`/system/feature-flags/${encodeURIComponent(key)}`, body),
+
+  // Permissions
+  listPermissions: () => apiGet<PermissionDto[]>('/system/permissions'),
+  getPermissionMatrix: () => apiGet<PermissionMatrixDto>('/system/permissions/matrix'),
+  updateRolePermissions: (role: Role, keys: string[]) =>
+    apiPut<PermissionMatrixDto>(`/system/permissions/${encodeURIComponent(role)}`, { keys }),
 };

@@ -15,6 +15,7 @@ import {
   Zap,
   Crown,
   Flag,
+  KeyRound,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +32,7 @@ const NAV = [
 const SUPER_NAV = [
   { href: '/admin/system/settings', label: 'Cài đặt hệ thống', icon: Settings },
   { href: '/admin/system/roles', label: 'Quản lý role', icon: Crown },
+  { href: '/admin/system/permissions', label: 'Phân quyền', icon: KeyRound },
   { href: '/admin/system/feature-flags', label: 'Feature flags', icon: Flag },
 ];
 

@@ -38,8 +38,14 @@ const PROTECTED: Route[] = [
 
 const AUTH_PAGES = /^\/(login|register|forgot-password)(\/|$)/;
 
+// Khi USE_MOCK=true → demo chips có thể vào mọi route mà không cần login.
+const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== 'false';
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (USE_MOCK) return NextResponse.next();
+
   const token = req.cookies.get(ACCESS_COOKIE)?.value;
   const payload = token ? decodeJwtPayload(token) : null;
   const isLoggedIn = !!payload?.sub && (!payload.exp || payload.exp * 1000 > Date.now());
