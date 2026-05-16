@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   LayoutDashboard,
   Building2,
@@ -16,7 +17,11 @@ import {
   Crown,
   Flag,
   KeyRound,
+  LogOut,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { logout } from '@/lib/data/auth';
+import { isApiError } from '@/lib/api/errors';
 import { cn } from '@/lib/utils';
 
 const NAV = [
@@ -38,6 +43,20 @@ const SUPER_NAV = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout() {
+    if (!confirm('Đăng xuất khỏi tài khoản?')) return;
+    try {
+      await logout();
+    } catch (e) {
+      toast.error(isApiError(e) ? e.message : 'Đăng xuất thất bại');
+      return;
+    }
+    toast.success('Đã đăng xuất');
+    router.replace('/login');
+    router.refresh();
+  }
   return (
     <div className="flex min-h-screen bg-muted/30">
       <aside className="hidden w-64 shrink-0 border-r bg-card lg:flex lg:flex-col">
@@ -109,9 +128,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       <main className="flex-1">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b bg-background px-6">
           <h1 className="text-lg font-semibold">Admin Portal</h1>
-          <span className="text-xs text-muted-foreground">Super Admin · admin@sportsbooking.local</span>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              Super Admin · admin@sportsbooking.local
+            </span>
+            <Button size="sm" variant="outline" onClick={handleLogout}>
+              <LogOut className="h-3.5 w-3.5" />
+              Đăng xuất
+            </Button>
+          </div>
         </header>
         <div className="p-6">{children}</div>
       </main>

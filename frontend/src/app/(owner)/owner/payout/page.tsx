@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Pagination } from '@/components/ui/pagination';
 import { Building2, Edit2, Download } from 'lucide-react';
 import { formatVND } from '@/lib/format';
 import { getPayoutSummary, requestPayout } from '@/lib/data/owner';
@@ -15,6 +16,13 @@ export default function OwnerPayoutPage() {
   const [data, setData] = useState<PayoutSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const pagedHistory = useMemo(() => {
+    if (!data) return [];
+    return data.history.slice((page - 1) * pageSize, page * pageSize);
+  }, [data, page, pageSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,7 +166,7 @@ export default function OwnerPayoutPage() {
               </tr>
             </thead>
             <tbody>
-              {data.history.map((h) => (
+              {pagedHistory.map((h) => (
                 <tr key={h.id} className="border-b last:border-0">
                   <td className="px-6 py-3">
                     {new Date(h.createdAt).toLocaleDateString('vi-VN')}
@@ -175,6 +183,15 @@ export default function OwnerPayoutPage() {
               ))}
             </tbody>
           </table>
+        )}
+        {data.history.length > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={data.history.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         )}
       </Card>
     </div>

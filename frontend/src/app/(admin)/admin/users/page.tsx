@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Pagination } from '@/components/ui/pagination';
 import { Search, Download } from 'lucide-react';
 import { listAdminUsers, updateAdminUser } from '@/lib/data/admin';
 import { isApiError } from '@/lib/api/errors';
@@ -29,6 +30,19 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | ''>('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset về trang 1 khi filter đổi
+  useEffect(() => {
+    setPage(1);
+  }, [q, roleFilter]);
+
+  // Slice client-side (server-side pagination sẽ chuyển sang dùng params page/pageSize)
+  const pagedUsers = useMemo(
+    () => users.slice((page - 1) * pageSize, page * pageSize),
+    [users, page, pageSize],
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -138,7 +152,7 @@ export default function AdminUsersPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {pagedUsers.map((u) => (
                 <tr key={u.id} className="border-b last:border-0 hover:bg-muted/20">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -193,6 +207,16 @@ export default function AdminUsersPage() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {!loading && users.length > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         )}
       </Card>
     </div>

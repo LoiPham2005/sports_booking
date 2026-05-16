@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Pagination } from '@/components/ui/pagination';
 import { AlertTriangle } from 'lucide-react';
 import { formatVND } from '@/lib/format';
 import { listDisputes, resolveDispute } from '@/lib/data/admin';
@@ -16,6 +17,13 @@ export default function AdminDisputesPage() {
   const [disputes, setDisputes] = useState<AdminDisputeDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const pagedDisputes = useMemo(
+    () => disputes.slice((page - 1) * pageSize, page * pageSize),
+    [disputes, page, pageSize],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -66,7 +74,7 @@ export default function AdminDisputesPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {disputes.map((d) => (
+          {pagedDisputes.map((d) => (
             <Card key={d.id} className="p-5">
               <div className="flex flex-wrap items-start gap-4">
                 <Avatar className="h-12 w-12">
@@ -121,6 +129,19 @@ export default function AdminDisputesPage() {
               </div>
             </Card>
           ))}
+
+          {disputes.length > 0 && (
+            <Card className="overflow-hidden p-0">
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={disputes.length}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                className="border-t-0"
+              />
+            </Card>
+          )}
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
   @ApiProperty({ description: 'Email hoặc số điện thoại' })
@@ -13,9 +13,10 @@ export class LoginDto {
 }
 
 export class RefreshDto {
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Optional — nếu không truyền sẽ đọc từ cookie sb_refresh' })
+  @IsOptional()
   @IsString()
-  refreshToken!: string;
+  refreshToken?: string;
 }
 
 export class ForgotPasswordDto {

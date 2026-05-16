@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/pagination';
 import { formatVND } from '@/lib/format';
 import { listOwnerBookings, refuseBooking } from '@/lib/data/owner';
 import type { UiBooking } from '@/lib/api/adapters/booking';
@@ -27,6 +28,12 @@ function OwnerBookingsInner() {
   const [bookings, setBookings] = useState<UiBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refusingId, setRefusingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  useEffect(() => {
+    setPage(1);
+  }, [date, venueFilter]);
 
   useEffect(() => {
     setLoading(true);
@@ -43,6 +50,10 @@ function OwnerBookingsInner() {
   const sorted = useMemo(
     () => [...bookings].sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
     [bookings],
+  );
+  const paged = useMemo(
+    () => sorted.slice((page - 1) * pageSize, page * pageSize),
+    [sorted, page, pageSize],
   );
 
   function shiftDate(delta: number) {
@@ -127,7 +138,7 @@ function OwnerBookingsInner() {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((b) => {
+              {paged.map((b) => {
                 const start = new Date(b.startsAt);
                 const end = new Date(b.endsAt);
                 const label = STATUS_LABEL[b.status];
@@ -172,6 +183,15 @@ function OwnerBookingsInner() {
               })}
             </tbody>
           </table>
+          {sorted.length > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={sorted.length}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </Card>
       )}
 

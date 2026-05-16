@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Pagination } from '@/components/ui/pagination';
 import { Search, Download } from 'lucide-react';
 import { listAuditLog } from '@/lib/data/admin';
 import type { AuditLogDto } from '@/lib/api/endpoints/admin';
@@ -22,6 +23,17 @@ export default function AdminAuditPage() {
   const [events, setEvents] = useState<AuditLogDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  useEffect(() => {
+    setPage(1);
+  }, [actionFilter]);
+
+  const pagedEvents = useMemo(
+    () => events.slice((page - 1) * pageSize, page * pageSize),
+    [events, page, pageSize],
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -85,7 +97,7 @@ export default function AdminAuditPage() {
               </tr>
             </thead>
             <tbody>
-              {events.map((e) => (
+              {pagedEvents.map((e) => (
                 <tr key={e.id} className="border-b last:border-0 hover:bg-muted/20">
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                     {new Date(e.createdAt).toLocaleString('vi-VN')}
@@ -131,6 +143,16 @@ export default function AdminAuditPage() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {!loading && events.length > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={events.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         )}
       </Card>
     </div>

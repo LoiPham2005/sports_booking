@@ -382,6 +382,11 @@ npx prisma migrate dev --name phase4_owner
 - A11y check
 
 ### ✅ Đã xong gần đây
+- **Pagination dùng chung** — [components/ui/pagination.tsx](../frontend/src/components/ui/pagination.tsx). Hỗ trợ chọn page size (10/20/50/100), điều hướng trang với ellipsis, nút first/last, hiển thị "X – Y / Z bản ghi". Đã tích hợp client-side slice (mock + API đều OK) tại:
+  - **Admin**: `/admin/users`, `/admin/audit`, `/admin/venues`, `/admin/vouchers`, `/admin/disputes`
+  - **Owner**: `/owner/bookings`, `/owner/payout` (history), `/owner/staff`
+  - **Staff (Manager)**: `/staff/team`
+  - Khi backend hỗ trợ `?page=&pageSize=`, chỉ cần bỏ slice và truyền params — không phải đổi UI.
 - **Venue Map (web)** — [/venues](../frontend/src/app/(public)/venues/page.tsx) tab "Bản đồ" dùng OpenStreetMap qua `react-leaflet@4` + `leaflet`. Marker emoji theo môn thể thao, popup card, side panel danh sách, auto fit bounds. Hoạt động với cả mock và real API (`UiVenue.lat/lng` được map từ `VenueDto`).
 - **RBAC động** — bảng `Permission` + `RolePermission` + UI `/admin/system/permissions` (matrix tích chọn). Decorator `@RequirePermission` + `PermissionsGuard` cho các route khác dùng.
 - **Frontend → `src/`** — chuyển `app/`, `components/`, `lib/`, `middleware.ts` vào `src/`. Cập nhật `tsconfig.paths` và `tailwind.config.content`.

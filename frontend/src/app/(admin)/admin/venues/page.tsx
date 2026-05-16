@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useMemo, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Search, MapPin } from 'lucide-react';
+import { Pagination } from '@/components/ui/pagination';
 import { listAdminVenues, approveVenue, rejectVenue } from '@/lib/data/admin';
 import { isApiError } from '@/lib/api/errors';
 import type { AdminVenueDto } from '@/lib/api/endpoints/admin';
@@ -37,6 +38,17 @@ function AdminVenuesInner() {
   const [venues, setVenues] = useState<AdminVenueDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [status, q]);
+
+  const pagedVenues = useMemo(
+    () => venues.slice((page - 1) * pageSize, page * pageSize),
+    [venues, page, pageSize],
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -129,7 +141,7 @@ function AdminVenuesInner() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {venues.map((v) => {
+          {pagedVenues.map((v) => {
             const tone = STATUS_LABEL[v.status]?.tone ?? 'default';
             const text = STATUS_LABEL[v.status]?.text ?? v.status;
             return (
@@ -184,6 +196,19 @@ function AdminVenuesInner() {
               </Card>
             );
           })}
+
+          {venues.length > 0 && (
+            <Card className="overflow-hidden p-0">
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={venues.length}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                className="border-t-0"
+              />
+            </Card>
+          )}
         </div>
       )}
     </div>

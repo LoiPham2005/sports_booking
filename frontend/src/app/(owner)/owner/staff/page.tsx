@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Plus, Search } from 'lucide-react';
+import { Pagination } from '@/components/ui/pagination';
 import {
   listStaff,
   inviteStaff,
@@ -32,6 +33,12 @@ export default function OwnerStaffPage() {
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
 
   // Invite form
   const [inviteEmail, setInviteEmail] = useState('');
@@ -94,16 +101,24 @@ export default function OwnerStaffPage() {
     }
   }
 
-  const filtered = staff.filter((s) => {
-    if (!query.trim()) return true;
-    const q = query.toLowerCase();
-    return (
-      s.user?.fullName?.toLowerCase().includes(q) ||
-      s.email?.toLowerCase().includes(q) ||
-      s.user?.phone?.toLowerCase().includes(q) ||
-      s.venue.name.toLowerCase().includes(q)
-    );
-  });
+  const filtered = useMemo(
+    () =>
+      staff.filter((s) => {
+        if (!query.trim()) return true;
+        const q = query.toLowerCase();
+        return (
+          s.user?.fullName?.toLowerCase().includes(q) ||
+          s.email?.toLowerCase().includes(q) ||
+          s.user?.phone?.toLowerCase().includes(q) ||
+          s.venue.name.toLowerCase().includes(q)
+        );
+      }),
+    [staff, query],
+  );
+  const pagedStaff = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  );
 
   return (
     <div className="space-y-6">
@@ -191,7 +206,7 @@ export default function OwnerStaffPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((s) => {
+              {pagedStaff.map((s) => {
                 const name = s.user?.fullName ?? '(chưa accept)';
                 const initials = (s.user?.fullName ?? s.email ?? '?')[0].toUpperCase();
                 return (
@@ -243,6 +258,16 @@ export default function OwnerStaffPage() {
               })}
             </tbody>
           </table>
+        )}
+
+        {!loading && filtered.length > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={filtered.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         )}
       </Card>
     </div>

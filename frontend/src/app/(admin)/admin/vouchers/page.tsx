@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Tag } from 'lucide-react';
+import { Pagination } from '@/components/ui/pagination';
 import { formatVND } from '@/lib/format';
 import {
   listAdminVouchers,
@@ -26,6 +27,13 @@ export default function AdminVouchersPage() {
   const [vouchers, setVouchers] = useState<VoucherDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const pagedVouchers = useMemo(
+    () => vouchers.slice((page - 1) * pageSize, page * pageSize),
+    [vouchers, page, pageSize],
+  );
 
   // Form
   const [code, setCode] = useState('');
@@ -215,7 +223,7 @@ export default function AdminVouchersPage() {
               </tr>
             </thead>
             <tbody>
-              {vouchers.map((v) => (
+              {pagedVouchers.map((v) => (
                 <tr key={v.id} className="border-b last:border-0 hover:bg-muted/20">
                   <td className="px-4 py-3">
                     <div className="inline-flex items-center gap-2">
@@ -265,6 +273,16 @@ export default function AdminVouchersPage() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {!loading && vouchers.length > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={vouchers.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         )}
       </Card>
     </div>

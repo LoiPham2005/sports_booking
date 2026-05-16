@@ -232,6 +232,7 @@ Chỉ SUPER_ADMIN xem được. Hiển thị badge "SUPER ADMIN" trong header.
 - `tooltip`
 - `skeleton`
 - `toast`/`sonner`
+- `pagination` — dùng chung cho mọi list/table. Props: `page`, `pageSize`, `total`, `onPageChange`, `onPageSizeChange`, optional `pageSizeOptions` (default `[10, 20, 50, 100]`), `siblingCount` (default 1), `showFirstLast` (default true), `disabled`. Hiển thị `X – Y / Z bản ghi`, dropdown chọn page size, các nút trang với ellipsis `...`. Đã áp dụng tại 8 trang admin/owner/staff (xem [STATUS.md](STATUS.md#test-accounts-seed)).
 
 ### Shared (`components/shared/`)
 - `header.tsx`, `footer.tsx`, `mobile-nav.tsx`

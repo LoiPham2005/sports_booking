@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Pagination } from '@/components/ui/pagination';
 import { Crown, Phone, Shield } from 'lucide-react';
 import { useStaffRole } from '@/lib/use-staff-role';
 import { getTeam } from '@/lib/data/staff';
@@ -15,6 +16,13 @@ export default function StaffTeamPage() {
   const role = useStaffRole();
   const [team, setTeam] = useState<StaffMemberDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const pagedTeam = useMemo(
+    () => team.slice((page - 1) * pageSize, page * pageSize),
+    [team, page, pageSize],
+  );
 
   useEffect(() => {
     if (role !== 'manager') {
@@ -66,7 +74,7 @@ export default function StaffTeamPage() {
               </tr>
             </thead>
             <tbody>
-              {team.map((s) => {
+              {pagedTeam.map((s) => {
                 const name = s.user?.fullName ?? '(chưa accept)';
                 const initials = (s.user?.fullName ?? s.email ?? '?')[0].toUpperCase();
                 const isManager = s.role === 'MANAGER';
@@ -116,6 +124,15 @@ export default function StaffTeamPage() {
               })}
             </tbody>
           </table>
+        )}
+        {!loading && team.length > 0 && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={team.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         )}
       </Card>
 
