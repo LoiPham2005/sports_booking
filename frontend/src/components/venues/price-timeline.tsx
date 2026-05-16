@@ -13,10 +13,21 @@ function hhmmToHours(hhmm: string): number {
   return h + m / 60;
 }
 
+export interface CellSelection {
+  /** dayOfWeek (0..6) */
+  day: number;
+  /** Giờ bắt đầu inclusive (0..23) */
+  startHour: number;
+  /** Giờ kết thúc exclusive (1..24) — tức "13" nghĩa là tới 13:00 */
+  endHour: number;
+}
+
 interface Props {
   rules: PriceRuleDto[];
-  /** Click vào ô trống → callback với ngày + giờ bắt đầu. Optional: để add nhanh */
-  onAdd?: (dayOfWeek: number, startTime: string) => void;
+  /** Selection hiện tại (parent kiểm soát) */
+  selection: CellSelection | null;
+  /** Click ô trống — parent quyết định: tạo selection mới hoặc extend */
+  onCellClick?: (day: number, hour: number) => void;
   /** Click vào block giá → edit */
   onEdit?: (rule: PriceRuleDto) => void;
 }
@@ -25,7 +36,7 @@ interface Props {
  * Timeline 7 ngày × 24h. Mỗi rule là 1 block màu, hiển thị giá.
  * Color = lerp giữa primary (rẻ) → destructive (đắt) theo `pricePerSlot`.
  */
-export function PriceTimeline({ rules, onAdd, onEdit }: Props) {
+export function PriceTimeline({ rules, selection, onCellClick, onEdit }: Props) {
   // Tính min/max price để màu lerp
   const { minPrice, maxPrice } = useMemo(() => {
     if (rules.length === 0) return { minPrice: 0, maxPrice: 0 };
@@ -106,22 +117,34 @@ export function PriceTimeline({ rules, onAdd, onEdit }: Props) {
                   height: ROW_HEIGHT,
                 }}
               >
-                {/* Layer 1: 24 ô trống click để add */}
+                {/* Layer 1: 24 ô trống click để chọn (highlight nếu trong selection) */}
                 <div
                   className="absolute inset-0 grid"
                   style={{ gridTemplateColumns: `repeat(24, ${HOUR_WIDTH}px)` }}
                 >
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <button
-                      key={h}
-                      type="button"
-                      onClick={() => onAdd?.(dow, `${String(h).padStart(2, '0')}:00`)}
-                      title={`Thêm khung giá lúc ${String(h).padStart(2, '0')}:00`}
-                      className="group border-r border-dashed border-border/40 last:border-r-0 hover:bg-primary/5"
-                    >
-                      <Plus className="mx-auto h-3.5 w-3.5 opacity-0 group-hover:opacity-50" />
-                    </button>
-                  ))}
+                  {Array.from({ length: 24 }, (_, h) => {
+                    const inSelection =
+                      selection?.day === dow && h >= selection.startHour && h < selection.endHour;
+                    return (
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => onCellClick?.(dow, h)}
+                        title={`${String(h).padStart(2, '0')}:00 – ${String(h + 1).padStart(2, '0')}:00`}
+                        className={`group border-r border-dashed border-border/40 last:border-r-0 transition-colors ${
+                          inSelection
+                            ? 'bg-primary/25 ring-1 ring-inset ring-primary'
+                            : 'hover:bg-primary/5'
+                        }`}
+                      >
+                        <Plus
+                          className={`mx-auto h-3.5 w-3.5 transition-opacity ${
+                            inSelection ? 'opacity-70 text-primary' : 'opacity-0 group-hover:opacity-50'
+                          }`}
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Layer 2: overlay các rule (z-index cao hơn) */}
