@@ -67,7 +67,7 @@
 | `district` | string | `district` | `String?` | ✅ | |
 | `city` | string | `city` | `String` | ✅ | |
 | — | — | `country` | `String @default("VN")` | — | UI không cần |
-| — | — | `lat`, `lng` | `Decimal?` | 🆕 UI | UI chưa có Map view (đã liệt kê trong STATUS.md) — cần khi mở map |
+| — | — | `lat`, `lng` | `Decimal?` | ✅ | Map view dùng — `VenueDto.lat/lng` (number\|null) → `UiVenue.lat/lng` qua `toUiVenue`. Mock data đã có toạ độ HCM thật. Seed backend tạo 7 venue có lat/lng. |
 | — | — | `phone` | `String?` | 🆕 UI | UI venue detail chưa hiện số ĐT venue |
 | — | — | `status` | `VenueStatus` (DRAFT/PENDING/APPROVED/SUSPENDED) | ⚠️ | UI customer mặc định coi như APPROVED. Owner UI cần hiện badge status, Admin UI đã có flow approve |
 | `rating` | double | `ratingAvg` | `Decimal(2,1)` | 🔄 | Rename + Decimal→number |

@@ -16,7 +16,7 @@
 ### ✅ Đã làm
 - **Prisma schema**: 27 models, 16 enums, exclusion constraint chống trùng booking (btree_gist)
 - **Migration**: `prisma/migrations/000_init_extensions.sql` — extensions + EXCLUDE
-- **Seed**: admin + owner + venue demo
+- **Seed**: đầy đủ test account 5 role + 1 venue cầu lông demo + 6 venue HCM cho map. Manager/Staff đã có `VenueMember` ACTIVE gắn với venue demo. Xem [§ Test accounts](#test-accounts-seed) bên dưới.
 - **Modules** (11):
   - `auth` — JWT + refresh rotation, Google OAuth, OTP, password reset
   - `users` — profile, sessions, favorites, devices
@@ -74,7 +74,6 @@
 
 ### ⏳ Chưa làm
 - Notifications page chi tiết (đã có /account/notifications nhưng thiếu group theo ngày)
-- Map view trên web `/venues` (mobile đã có OSM, web chưa)
 - Real-time booking calendar update (cần WebSocket)
 - Dark mode toggle UI (theme đã chuẩn bị trong globals.css)
 - i18n EN
@@ -379,6 +378,29 @@ npx prisma migrate dev --name phase4_owner
 ### Polish
 - Dark mode toggle
 - i18n EN
-- Map view venue
 - Tablet layout
 - A11y check
+
+### ✅ Đã xong gần đây
+- **Venue Map (web)** — [/venues](../frontend/src/app/(public)/venues/page.tsx) tab "Bản đồ" dùng OpenStreetMap qua `react-leaflet@4` + `leaflet`. Marker emoji theo môn thể thao, popup card, side panel danh sách, auto fit bounds. Hoạt động với cả mock và real API (`UiVenue.lat/lng` được map từ `VenueDto`).
+- **RBAC động** — bảng `Permission` + `RolePermission` + UI `/admin/system/permissions` (matrix tích chọn). Decorator `@RequirePermission` + `PermissionsGuard` cho các route khác dùng.
+- **Frontend → `src/`** — chuyển `app/`, `components/`, `lib/`, `middleware.ts` vào `src/`. Cập nhật `tsconfig.paths` và `tailwind.config.content`.
+- **Seed venue với lat/lng** — `prisma/seed.ts` tạo 7 venue HCM (Phú Mỹ Hưng, Bình Thạnh, Quận 10, Quận 1 Pickleball/Tao Đàn, Thủ Đức, demo cầu lông) để map có data thật ngay sau `npm run prisma:seed`.
+
+## Test accounts (seed)
+
+Chạy `npm run prisma:seed` để tạo/cập nhật toàn bộ. Mọi tài khoản `emailVerified: true`.
+
+| Email | Password | `User.role` | Ghi chú |
+|---|---|---|---|
+| `super@sportsbooking.local` | `12345678` | `SUPER_ADMIN` | Toàn quyền hệ thống, dùng test `/admin/system/*` |
+| `admin@sportsbooking.local` | `12345678` | `ADMIN` | Test các trang `/admin/*` (duyệt venue, voucher, dispute) — KHÔNG có `system/*` |
+| `owner@sportsbooking.local` | `12345678` | `OWNER` | Sở hữu 7 venue demo. Test `/owner/*` |
+| `manager@sportsbooking.local` | `manager@1234` | `STAFF` | `VenueMember.role = MANAGER` ở "Sân cầu lông Demo". Có quyền đặt giá + xem báo cáo venue |
+| `staff@sportsbooking.local` | `staff@1234` | `STAFF` | `VenueMember.role = STAFF` ở "Sân cầu lông Demo". Chỉ check-in + xem lịch |
+| `customer@sportsbooking.local` | `customer@1234` | `CUSTOMER` | User thường, test flow đặt sân |
+
+**Phân biệt `User.role = STAFF` và `VenueMember.role`**:
+- `User.role` là level toàn cục (5 giá trị).
+- `VenueMember.role` là chức vụ tại **một venue cụ thể** (MANAGER/STAFF). Một user STAFF có thể là MANAGER ở venue A và STAFF ở venue B đồng thời.
+- Manager/Staff đều phải có `User.role = STAFF` mới được Owner invite (frontend `useStaffRole()` đọc memberships để phân biệt).

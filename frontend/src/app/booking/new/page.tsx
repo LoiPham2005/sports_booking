@@ -30,7 +30,11 @@ function parseSlots(raw: string | null): { courtId: string; hours: string[] } | 
   const decoded = decodeURIComponent(raw);
   // Multiple courts có ';' phân tách. Lấy court đầu tiên.
   const [firstCourtBlock] = decoded.split(';');
-  const [courtId, hoursStr] = firstCourtBlock.split(':');
+  // Chỉ tách ở dấu ':' đầu tiên — phần còn lại chứa 'HH:MM' với chính dấu ':'.
+  const sep = firstCourtBlock.indexOf(':');
+  if (sep === -1) return null;
+  const courtId = firstCourtBlock.slice(0, sep);
+  const hoursStr = firstCourtBlock.slice(sep + 1);
   if (!courtId || !hoursStr) return null;
   const hours = hoursStr.split(',').filter(Boolean);
   if (hours.length === 0) return null;

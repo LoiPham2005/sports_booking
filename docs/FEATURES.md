@@ -70,7 +70,10 @@ Tài liệu liệt kê đầy đủ chức năng của backend (NestJS). Mỗi m
   - SUPER_ADMIN luôn pass mọi permission check; không cho phép sửa permission của SUPER_ADMIN từ UI để tránh tự khóa.
   - 23 permission mặc định seed lần đầu (Venue/Booking/User/Voucher/Payout/Dispute/Report/Audit/System).
 - OWNER chỉ thao tác được trên Venue mà họ sở hữu (scope guard).
-- STAFF được OWNER cấp quyền theo từng venue (`VenueMember` table).
+- STAFF được OWNER cấp quyền theo từng venue (`VenueMember` table). `VenueMember.role` có 2 mức:
+  - **MANAGER** — đặt giá, xem báo cáo doanh thu, quản lý nhân viên của venue.
+  - **STAFF** — check-in khách, xem lịch hôm nay, không thao tác giá/báo cáo.
+- **Seed test**: `npm run prisma:seed` tạo sẵn 1 tài khoản mỗi role (xem [STATUS.md → Test accounts](STATUS.md#test-accounts-seed)).
 
 ### Endpoint
 - `POST /owner/apply` — user gửi đơn xin lên OWNER (kèm giấy tờ).

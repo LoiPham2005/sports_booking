@@ -457,13 +457,19 @@ const data = USE_MOCK
 
 ### Database seed
 
-Khi test phase 1-3 cần Customer/Owner test:
+Chạy 1 lệnh đã có sẵn:
 ```bash
 cd backend
-npm run prisma:seed -- --full   # tạo 2 owner + 6 venue + 30 bookings random
+npm run prisma:seed
 ```
 
-→ Cần upgrade `prisma/seed.ts` để generate đủ data.
+Seed tạo:
+- 6 sport + 7 amenity + 23 permission (RBAC động)
+- 6 user — 1 cho mỗi role (xem [STATUS.md § Test accounts](STATUS.md#test-accounts-seed))
+- 7 venue HCM có `lat/lng` thật (cho map view) + 1 venue cầu lông demo (có giá theo PriceRule)
+- `VenueMember` ACTIVE cho manager/staff demo trên venue cầu lông
+
+⚠️ TODO: chưa generate booking giả + payment để test Phase 4 (Owner reports cần data). Mở rộng `prisma/seed.ts` khi bắt đầu phase đó.
 
 ---
 
