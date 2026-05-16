@@ -29,6 +29,8 @@ function mockVenueToUi(v: (typeof VENUES)[number]): UiVenue {
     distance: v.distance,
     image: v.image,
     amenities: v.amenities,
+    lat: v.lat,
+    lng: v.lng,
   };
 }
 

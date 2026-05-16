@@ -7,6 +7,7 @@ import { Header } from '@/components/shared/header';
 import { Footer } from '@/components/shared/footer';
 import { MobileNav } from '@/components/shared/mobile-nav';
 import { VenueCard } from '@/components/shared/venue-card';
+import { VenueMap } from '@/components/venues/venue-map';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -256,22 +257,7 @@ function VenuesInner() {
                 </div>
               )
             ) : (
-              <div className="relative h-[600px] overflow-hidden rounded-xl border bg-muted">
-                <div className="absolute inset-0 grid place-items-center">
-                  <div className="text-center">
-                    <MapIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      Bản đồ Leaflet/OpenStreetMap sẽ được nhúng tại đây
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Pin các venue với popup card khi click
-                    </p>
-                  </div>
-                </div>
-                <div className="absolute left-[20%] top-[30%] h-3 w-3 rounded-full bg-primary ring-4 ring-primary/20" />
-                <div className="absolute left-[50%] top-[60%] h-3 w-3 rounded-full bg-primary ring-4 ring-primary/20" />
-                <div className="absolute left-[75%] top-[40%] h-3 w-3 rounded-full bg-primary ring-4 ring-primary/20" />
-              </div>
+              <VenueMap venues={venues} />
             )}
           </section>
         </div>

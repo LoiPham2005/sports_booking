@@ -30,6 +30,8 @@ export type Venue = {
   distance: number;
   image: string;
   amenities: string[];
+  lat: number;
+  lng: number;
 };
 
 export const VENUES: Venue[] = [
@@ -48,6 +50,8 @@ export const VENUES: Venue[] = [
     image:
       'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=800&auto=format&fit=crop',
     amenities: ['parking', 'changing_room', 'led_light', 'shower'],
+    lat: 10.7299,
+    lng: 106.7215,
   },
   {
     id: 'v2',
@@ -64,6 +68,8 @@ export const VENUES: Venue[] = [
     image:
       'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=800&auto=format&fit=crop',
     amenities: ['wifi', 'parking', 'led_light', 'water'],
+    lat: 10.8014,
+    lng: 106.7109,
   },
   {
     id: 'v3',
@@ -80,6 +86,8 @@ export const VENUES: Venue[] = [
     image:
       'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=800&auto=format&fit=crop',
     amenities: ['parking', 'changing_room', 'shower'],
+    lat: 10.7745,
+    lng: 106.6649,
   },
   {
     id: 'v4',
@@ -96,6 +104,8 @@ export const VENUES: Venue[] = [
     image:
       'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=800&auto=format&fit=crop',
     amenities: ['wifi', 'parking', 'changing_room', 'led_light', 'shower', 'water'],
+    lat: 10.7806,
+    lng: 106.7019,
   },
   {
     id: 'v5',
@@ -112,6 +122,8 @@ export const VENUES: Venue[] = [
     image:
       'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800&auto=format&fit=crop',
     amenities: ['parking', 'led_light'],
+    lat: 10.7716,
+    lng: 106.6919,
   },
   {
     id: 'v6',
@@ -128,6 +140,8 @@ export const VENUES: Venue[] = [
     image:
       'https://images.unsplash.com/photo-1486286701208-1d58e9338013?w=800&auto=format&fit=crop',
     amenities: ['parking', 'changing_room', 'led_light', 'shower', 'water'],
+    lat: 10.8505,
+    lng: 106.7717,
   },
 ];
 
