@@ -38,9 +38,20 @@ export type StaffRole = 'MANAGER' | 'STAFF';
 export interface CreateVenueInput {
   name: string;
   addressLine: string;
+  /** Tỉnh/TP user nhập gốc (cũ hoặc mới — tuỳ format). */
   city: string;
-  ward?: string;
+  /** Quận/Huyện (chỉ format cũ trước 7/2025). */
   district?: string;
+  /** Phường/Xã user nhập gốc. */
+  ward?: string;
+  /** Tỉnh sau cải cách hành chính 7/2025 — luôn gửi nếu chọn qua dropdown. */
+  newCity?: string;
+  /** Xã/phường sau cải cách 7/2025. */
+  newWard?: string;
+  /** Mã hành chính chính thức (theo openapi.vn) — vd "79". */
+  provinceCode?: string;
+  /** Mã xã/phường mới — vd "79100". */
+  wardCode?: string;
   description?: string;
   phone?: string;
   lat?: number;

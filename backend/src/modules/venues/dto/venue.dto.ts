@@ -31,9 +31,15 @@ export class SearchVenuesDto {
 export class CreateVenueDto {
   @IsString() name!: string;
   @IsString() addressLine!: string;
+  // Legacy format (user nhập gốc — có thể là cũ hoặc mới)
   @IsString() city!: string;
   @IsOptional() @IsString() ward?: string;
   @IsOptional() @IsString() district?: string;
+  // New format (sau cải cách 7/2025 — luôn populate)
+  @IsOptional() @IsString() newCity?: string;
+  @IsOptional() @IsString() newWard?: string;
+  @IsOptional() @IsString() provinceCode?: string;
+  @IsOptional() @IsString() wardCode?: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() phone?: string;
   @IsOptional() @IsLatitude() lat?: number;

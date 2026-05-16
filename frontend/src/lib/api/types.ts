@@ -99,6 +99,11 @@ export interface VenueDto {
   ward: string | null;
   district: string | null;
   city: string;
+  // Địa chỉ sau cải cách 7/2025 (luôn populate khi user nhập qua dropdown)
+  newCity?: string | null;
+  newWard?: string | null;
+  provinceCode?: string | null;
+  wardCode?: string | null;
   country: string;
   lat: number | null;
   lng: number | null;

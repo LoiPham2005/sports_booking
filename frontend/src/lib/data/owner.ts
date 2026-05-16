@@ -161,7 +161,7 @@ export async function createOwnerVenue(body: CreateVenueInput): Promise<UiVenue>
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '') || id,
       address: body.addressLine,
-      city: body.city,
+      city: body.newCity ?? body.city,
       district: body.district ?? '',
       sports: [],
       priceFrom: 0,

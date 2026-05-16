@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { MapPicker } from '@/components/venues/map-picker';
+import { AddressSelector, type AddressValue } from '@/components/venues/address-selector';
 import { createOwnerVenue } from '@/lib/data/owner';
 import { isApiError } from '@/lib/api/errors';
 import { cn } from '@/lib/utils';
@@ -19,9 +20,7 @@ type AddressMode = 'new' | 'old';
 interface FormState {
   name: string;
   addressLine: string;
-  city: string;
-  district: string; // chỉ dùng khi addressMode = 'old'
-  ward: string;
+  address: AddressValue;
   description: string;
   phone: string;
   lat: string;
@@ -31,9 +30,7 @@ interface FormState {
 const EMPTY: FormState = {
   name: '',
   addressLine: '',
-  city: 'TP. Hồ Chí Minh',
-  district: '',
-  ward: '',
+  address: { city: '' },
   description: '',
   phone: '',
   lat: '',
@@ -52,7 +49,7 @@ export default function NewVenuePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim() || !form.addressLine.trim() || !form.city.trim()) {
+    if (!form.name.trim() || !form.addressLine.trim() || !form.address.city) {
       toast.error('Vui lòng nhập đủ Tên, Địa chỉ, Tỉnh/Thành phố');
       return;
     }
@@ -67,10 +64,15 @@ export default function NewVenuePage() {
       const created = await createOwnerVenue({
         name: form.name.trim(),
         addressLine: form.addressLine.trim(),
-        city: form.city.trim(),
-        // Địa chỉ mới không còn Quận/Huyện — chỉ gửi district khi mode = 'old'
-        district: addressMode === 'old' ? form.district.trim() || undefined : undefined,
-        ward: form.ward.trim() || undefined,
+        city: form.address.city,
+        // Địa chỉ mới không có Quận/Huyện — chỉ gửi nếu user chọn format cũ
+        district: addressMode === 'old' ? form.address.district : undefined,
+        ward: form.address.ward,
+        // Địa chỉ mới (luôn gửi nếu user đã chọn qua dropdown)
+        newCity: form.address.newCity,
+        newWard: form.address.newWard,
+        provinceCode: form.address.provinceCode,
+        wardCode: form.address.wardCode,
         description: form.description.trim() || undefined,
         phone: form.phone.trim() || undefined,
         lat,
@@ -192,61 +194,20 @@ export default function NewVenuePage() {
                 />
               </div>
 
-              {addressMode === 'new' ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="v-city">
-                      Tỉnh / Thành phố <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="v-city"
-                      placeholder="VD: TP. Hồ Chí Minh"
-                      value={form.city}
-                      onChange={(e) => patch('city', e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="v-ward">Phường / Xã</Label>
-                    <Input
-                      id="v-ward"
-                      placeholder="VD: Phường Tân Phú"
-                      value={form.ward}
-                      onChange={(e) => patch('ward', e.target.value)}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="v-city">
-                      Tỉnh / Thành phố <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="v-city"
-                      value={form.city}
-                      onChange={(e) => patch('city', e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="v-district">Quận / Huyện</Label>
-                    <Input
-                      id="v-district"
-                      placeholder="VD: Quận 7"
-                      value={form.district}
-                      onChange={(e) => patch('district', e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="v-ward">Phường / Xã</Label>
-                    <Input
-                      id="v-ward"
-                      placeholder="VD: Tân Phú"
-                      value={form.ward}
-                      onChange={(e) => patch('ward', e.target.value)}
-                    />
-                  </div>
+              <AddressSelector
+                mode={addressMode}
+                value={form.address}
+                onChange={(next) => patch('address', next)}
+              />
+
+              {addressMode === 'old' && form.address.newCity && form.address.newWard && (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200">
+                  <p>
+                    ✓ Hệ thống đã tự quy đổi sang địa chỉ mới:{' '}
+                    <strong>
+                      {form.address.newWard}, {form.address.newCity}
+                    </strong>
+                  </p>
                 </div>
               )}
 
@@ -313,8 +274,8 @@ export default function NewVenuePage() {
               <li className={form.name ? 'text-foreground' : ''}>
                 {form.name ? '✓' : '○'} Tên venue
               </li>
-              <li className={form.addressLine && form.city ? 'text-foreground' : ''}>
-                {form.addressLine && form.city ? '✓' : '○'} Địa chỉ + Tỉnh/Thành
+              <li className={form.addressLine && form.address.city ? 'text-foreground' : ''}>
+                {form.addressLine && form.address.city ? '✓' : '○'} Địa chỉ + Tỉnh/Thành
               </li>
               <li className={form.lat && form.lng ? 'text-foreground' : ''}>
                 {form.lat && form.lng ? '✓' : '○'} Toạ độ bản đồ (khuyến khích)

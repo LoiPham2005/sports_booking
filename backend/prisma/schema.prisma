@@ -269,6 +269,14 @@ model Venue {
   country          String       @default("VN")
   lat              Decimal?     @db.Decimal(10, 7)
   lng              Decimal?     @db.Decimal(10, 7)
+  /// ─── Địa chỉ mới (sau cải cách hành chính 7/2025) ───
+  /// Luôn được điền: nếu user nhập địa chỉ cũ, hệ thống auto-convert sang format mới.
+  /// Dùng cho search & filter chính thay vì `city`/`ward` ở trên (vẫn giữ làm legacy).
+  newCity          String?
+  newWard          String?
+  /// Mã hành chính chính thức (theo openapi.vn / chinhphu.vn)
+  provinceCode     String?
+  wardCode         String?
   phone            String?
   status           VenueStatus  @default(DRAFT)
   ratingAvg        Decimal      @default(0) @db.Decimal(2, 1)
