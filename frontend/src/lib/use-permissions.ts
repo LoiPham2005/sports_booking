@@ -29,6 +29,7 @@ const MOCK_PERMISSIONS: Record<Role, string[]> = {
 };
 
 let cachedKeys: Set<string> | null = null;
+let cachedUserId: string | null = null;
 let inFlight: Promise<Set<string>> | null = null;
 
 /**
@@ -40,20 +41,28 @@ let inFlight: Promise<Set<string>> | null = null;
  */
 export function useMyPermissions(): Set<string> | undefined {
   const user = useCurrentUser();
-  const [keys, setKeys] = useState<Set<string> | undefined>(cachedKeys ?? undefined);
+  const initial = user && cachedUserId === user.id ? cachedKeys ?? undefined : undefined;
+  const [keys, setKeys] = useState<Set<string> | undefined>(initial);
 
   useEffect(() => {
     if (!user) {
-      cachedKeys = new Set();
-      setKeys(cachedKeys);
+      cachedKeys = null;
+      cachedUserId = null;
+      setKeys(new Set());
       return;
     }
-    if (cachedKeys) {
+    if (cachedKeys && cachedUserId === user.id) {
       setKeys(cachedKeys);
       return;
     }
 
+    // User changed — invalidate stale cache
+    cachedKeys = null;
+    inFlight = null;
+    setKeys(undefined);
+
     let cancelled = false;
+    const loadUserId = user.id;
     async function load(): Promise<Set<string>> {
       if (USE_MOCK) {
         if (user!.role === 'SUPER_ADMIN') return new Set(['*']);
@@ -67,6 +76,7 @@ export function useMyPermissions(): Set<string> | undefined {
     inFlight
       .then((s) => {
         cachedKeys = s;
+        cachedUserId = loadUserId;
         if (!cancelled) setKeys(s);
       })
       .catch(() => {
