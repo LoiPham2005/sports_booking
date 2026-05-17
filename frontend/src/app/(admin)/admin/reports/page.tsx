@@ -3,26 +3,44 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { DateRangePicker } from '@/components/ui/date-picker';
 import { Download } from 'lucide-react';
 import { formatVND, formatNumber } from '@/lib/format';
 import { getAdminReports } from '@/lib/data/admin';
 import type { AdminReportsResponse } from '@/lib/api/endpoints/admin';
 
+function todayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function nDaysAgoKey(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export default function AdminReportsPage() {
   const [data, setData] = useState<AdminReportsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [range, setRange] = useState({ from: nDaysAgoKey(30), to: todayKey() });
 
   useEffect(() => {
+    if (!range.from || !range.to) return;
     let cancelled = false;
-    getAdminReports()
+    setLoading(true);
+    setError(null);
+    // Convert YYYY-MM-DD → ISO 00:00 và 23:59 local
+    const fromIso = new Date(`${range.from}T00:00:00`).toISOString();
+    const toIso = new Date(`${range.to}T23:59:59.999`).toISOString();
+    getAdminReports({ from: fromIso, to: toIso })
       .then((d) => !cancelled && setData(d))
       .catch((e) => !cancelled && setError(e?.message ?? 'Không tải được báo cáo'))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [range.from, range.to]);
 
   if (loading) {
     return (
@@ -54,10 +72,13 @@ export default function AdminReportsPage() {
     );
   }
 
-  const totalGmv = data.series.reduce((s, x) => s + x.gmv, 0);
-  const totalBookings = data.series.reduce((s, x) => s + x.bookings, 0);
-  const avgGmv = data.series.length > 0 ? totalGmv / data.series.length : 0;
-  const seriesMax = Math.max(...data.series.map((s) => s.gmv), 1);
+  // Fill ngày trống giữa from..to → đảm bảo chart có đủ N cột (không bị 1 cột to)
+  const filledSeries = fillMissingDays(data.from, data.to, data.series);
+  const totalGmv = filledSeries.reduce((s, x) => s + x.gmv, 0);
+  const totalBookings = filledSeries.reduce((s, x) => s + x.bookings, 0);
+  const daysWithData = filledSeries.filter((s) => s.gmv > 0).length;
+  const avgGmv = daysWithData > 0 ? totalGmv / daysWithData : 0;
+  const seriesMax = Math.max(...filledSeries.map((s) => s.gmv), 1);
   const sportsTotal = data.bySport.reduce((s, x) => s + x.total, 0);
 
   return (
@@ -70,9 +91,16 @@ export default function AdminReportsPage() {
             {new Date(data.to).toLocaleDateString('vi-VN')}
           </p>
         </div>
-        <Button variant="outline" disabled>
-          <Download className="h-4 w-4" /> Export
-        </Button>
+        <div className="flex items-center gap-2">
+          <DateRangePicker
+            value={range}
+            onChange={setRange}
+            className="min-w-[280px]"
+          />
+          <Button variant="outline" disabled>
+            <Download className="h-4 w-4" /> Export
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -98,10 +126,14 @@ export default function AdminReportsPage() {
         <h3 className="font-bold">GMV theo ngày</h3>
         <p className="text-xs text-muted-foreground">Max: {formatVND(seriesMax)}</p>
         <div className="mt-4 flex h-48 items-end gap-0.5">
-          {data.series.map((s, i) => (
+          {filledSeries.map((s, i) => (
             <div
               key={i}
-              className="group flex-1 rounded-t-sm bg-gradient-to-t from-violet-400 to-violet-600"
+              className={`group flex-1 rounded-t-sm ${
+                s.gmv > 0
+                  ? 'bg-gradient-to-t from-violet-400 to-violet-600'
+                  : 'bg-muted/40'
+              }`}
               style={{ height: `${(s.gmv / seriesMax) * 100}%`, minHeight: '2px' }}
               title={`${new Date(s.day).toLocaleDateString('vi-VN')}: ${formatVND(s.gmv)} (${s.bookings} bookings)`}
             />
@@ -139,4 +171,52 @@ export default function AdminReportsPage() {
       </Card>
     </div>
   );
+}
+
+/**
+ * Fill ngày trống giữa `from` và `to` với gmv=0, bookings=0.
+ * Backend chỉ trả về ngày có booking → chart bị 1 cột to. Fill để có đủ N cột.
+ */
+/** Backend group theo NGÀY VN (UTC+7). Frontend iter cũng phải dùng cùng convention. */
+const VN_OFFSET_MS = 7 * 3600_000;
+
+function vnDayKey(d: Date): string {
+  return new Date(d.getTime() + VN_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+function fillMissingDays(
+  fromIso: string,
+  toIso: string,
+  series: { day: string; gmv: number; bookings: number }[],
+): { day: string; gmv: number; bookings: number }[] {
+  const from = new Date(fromIso);
+  const to = new Date(toIso);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return series;
+
+  // Backend trả `day` đã là chuỗi YYYY-MM-DD (giờ VN) → dùng trực tiếp làm key.
+  const byKey = new Map<string, { gmv: number; bookings: number }>();
+  for (const s of series) {
+    // Nếu day đã là 'YYYY-MM-DD' giữ nguyên, nếu là ISO chuyển sang VN day key
+    const key = /^\d{4}-\d{2}-\d{2}$/.test(s.day) ? s.day : vnDayKey(new Date(s.day));
+    byKey.set(key, { gmv: s.gmv, bookings: s.bookings });
+  }
+
+  const out: { day: string; gmv: number; bookings: number }[] = [];
+  // Iter từng ngày VN từ `from` đến `to`
+  const startVn = new Date(from.getTime() + VN_OFFSET_MS);
+  startVn.setUTCHours(0, 0, 0, 0);
+  const endVn = new Date(to.getTime() + VN_OFFSET_MS);
+  endVn.setUTCHours(0, 0, 0, 0);
+  let safety = 0;
+  while (startVn <= endVn && safety++ < 90) {
+    const key = startVn.toISOString().slice(0, 10);
+    const existing = byKey.get(key);
+    out.push({
+      day: key,
+      gmv: existing?.gmv ?? 0,
+      bookings: existing?.bookings ?? 0,
+    });
+    startVn.setUTCDate(startVn.getUTCDate() + 1);
+  }
+  return out;
 }

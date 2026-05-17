@@ -305,47 +305,57 @@ export class AdminService {
   async reports(params: { from?: string; to?: string }) {
     const from = params.from ? new Date(params.from) : new Date(Date.now() - 30 * 24 * 3600_000);
     const to = params.to ? new Date(params.to) : new Date();
-    // Pass as text[] thay vì enum[] — Postgres không tự cast TS string[] sang `BookingStatus[]`.
-    const success: string[] = ['CONFIRMED', 'CHECKED_IN', 'COMPLETED'];
 
-    const series = await this.prisma.$queryRaw<
-      Array<{ day: Date; gmv: number; bookings: number }>
-    >`
-      SELECT date_trunc('day', "startsAt") AS day,
-             COALESCE(SUM("total"), 0)::float AS gmv,
-             COUNT(*)::int AS bookings
-      FROM "Booking"
-      WHERE status::text = ANY(${success})
-        AND "startsAt" >= ${from} AND "startsAt" < ${to}
-      GROUP BY day ORDER BY day
-    `;
-
-    const bySport = await this.prisma.$queryRaw<Array<{ sportId: string; total: number; count: number }>>`
-      SELECT c."sportId",
-             COALESCE(SUM(b."total"), 0)::float AS total,
-             COUNT(*)::int AS count
-      FROM "Booking" b
-      INNER JOIN "Court" c ON c.id = b."courtId"
-      WHERE b.status::text = ANY(${success})
-        AND b."startsAt" >= ${from} AND b."startsAt" < ${to}
-      GROUP BY c."sportId"
-    `;
-    const sports = await this.prisma.sport.findMany({
-      where: { id: { in: bySport.map((s) => s.sportId) } },
-      select: { id: true, slug: true, nameVi: true },
+    // Lấy tất cả bookings active trong khoảng — aggregate ở memory cho an toàn type
+    // và đảm bảo `series` + `bySport` cùng dataset (tránh raw SQL drift).
+    const bookings = await this.prisma.booking.findMany({
+      where: {
+        status: { in: [BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN, BookingStatus.COMPLETED] },
+        createdAt: { gte: from, lt: to },
+      },
+      select: {
+        createdAt: true,
+        total: true,
+        court: { select: { sportId: true, sport: { select: { slug: true, nameVi: true } } } },
+      },
     });
 
-    return {
-      from,
-      to,
-      series: series.map((s) => ({ day: s.day, gmv: Number(s.gmv), bookings: s.bookings })),
-      bySport: bySport.map((s) => ({
-        sport: sports.find((x) => x.id === s.sportId)?.nameVi ?? s.sportId,
-        slug: sports.find((x) => x.id === s.sportId)?.slug ?? '',
-        total: Number(s.total),
-        count: s.count,
-      })),
-    };
+    // Group theo NGÀY VN (UTC+7) — convert local rồi lấy YYYY-MM-DD
+    const seriesMap = new Map<string, { gmv: number; bookings: number }>();
+    const sportMap = new Map<string, { slug: string; nameVi: string; total: number; count: number }>();
+
+    const VN_OFFSET_MS = 7 * 3600_000;
+    for (const b of bookings) {
+      const total = Number(b.total);
+      const vnDate = new Date(b.createdAt.getTime() + VN_OFFSET_MS);
+      const dayKey = vnDate.toISOString().slice(0, 10); // YYYY-MM-DD theo giờ VN
+
+      const sEntry = seriesMap.get(dayKey) ?? { gmv: 0, bookings: 0 };
+      sEntry.gmv += total;
+      sEntry.bookings += 1;
+      seriesMap.set(dayKey, sEntry);
+
+      const sportId = b.court.sportId;
+      const sEntry2 = sportMap.get(sportId) ?? {
+        slug: b.court.sport.slug,
+        nameVi: b.court.sport.nameVi,
+        total: 0,
+        count: 0,
+      };
+      sEntry2.total += total;
+      sEntry2.count += 1;
+      sportMap.set(sportId, sEntry2);
+    }
+
+    const series = Array.from(seriesMap.entries())
+      .map(([day, v]) => ({ day, gmv: v.gmv, bookings: v.bookings }))
+      .sort((a, b) => a.day.localeCompare(b.day));
+
+    const bySport = Array.from(sportMap.entries())
+      .map(([, v]) => ({ sport: v.nameVi, slug: v.slug, total: v.total, count: v.count }))
+      .sort((a, b) => b.total - a.total);
+
+    return { from, to, series, bySport };
   }
 
   // ─────────────────── Audit log ───────────────────
