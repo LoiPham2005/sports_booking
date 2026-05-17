@@ -45,7 +45,12 @@ export function useMyPermissions(): Set<string> | undefined {
   const [keys, setKeys] = useState<Set<string> | undefined>(initial);
 
   useEffect(() => {
-    if (!user) {
+    if (user === undefined) {
+      // Still loading user — keep keys as undefined (loading state)
+      setKeys(undefined);
+      return;
+    }
+    if (user === null) {
       cachedKeys = null;
       cachedUserId = null;
       setKeys(new Set());
@@ -108,5 +113,6 @@ export function useHasPermission(key: string): boolean | undefined {
 /** Clear cache (gọi sau logout / khi role đổi). */
 export function clearPermissionsCache() {
   cachedKeys = null;
+  cachedUserId = null;
   inFlight = null;
 }

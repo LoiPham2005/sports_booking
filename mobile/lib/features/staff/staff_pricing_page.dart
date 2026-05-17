@@ -290,7 +290,7 @@ class _StaffPricingPageState extends State<StaffPricingPage> {
                       TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                initialValue: 'all',
+                value: 'all',
                 decoration: const InputDecoration(isDense: true),
                 items: const [
                   DropdownMenuItem(value: 'all', child: Text('Tất cả sân')),
@@ -301,8 +301,8 @@ class _StaffPricingPageState extends State<StaffPricingPage> {
                 onChanged: (_) {},
               ),
               const SizedBox(height: 12),
-              Row(
-                children: const [
+              const Row(
+                children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

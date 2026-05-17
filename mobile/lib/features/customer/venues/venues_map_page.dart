@@ -657,7 +657,7 @@ class _VenuesMapPageState extends State<VenuesMapPage> {
                   setState(() {});
                 },
                 contentPadding: EdgeInsets.zero,
-                activeThumbColor: AppColors.primary,
+                activeColor: AppColors.primary,
               ),
 
               const SizedBox(height: 12),

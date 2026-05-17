@@ -207,7 +207,7 @@ class _OwnerVenueCreatePageState extends State<OwnerVenueCreatePage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    initialValue: _city,
+                    value: _city,
                     decoration: const InputDecoration(labelText: 'Thành phố *'),
                     items: const ['Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng']
                         .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -326,10 +326,10 @@ class _OwnerVenueCreatePageState extends State<OwnerVenueCreatePage> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(
+                const Expanded(
                   child: Text(
                     'sân',
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: AppColors.textSecondary, fontSize: 13),
                   ),
                 ),
