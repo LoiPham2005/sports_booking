@@ -448,7 +448,7 @@ export class OwnerService {
               COUNT(*)::int AS count
        FROM "Booking"
        WHERE "venueId" = ANY($1)
-         AND status = ANY($2)
+         AND status::text = ANY($2)
          AND "startsAt" >= $3 AND "startsAt" < $4
        GROUP BY bucket ORDER BY bucket`,
       venueIds,
@@ -547,6 +547,75 @@ export class OwnerService {
     });
 
     return payout;
+  }
+
+  // ─────────────────── Bank accounts ───────────────────
+
+  async listBankAccounts(ownerId: string) {
+    return this.prisma.bankAccount.findMany({
+      where: { userId: ownerId },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async upsertBankAccount(
+    ownerId: string,
+    dto: { bankCode: string; accountNumber: string; accountHolder: string; isDefault?: boolean },
+  ) {
+    // Mặc định: nếu là TK đầu tiên hoặc dto.isDefault=true → set isDefault và unset các TK khác.
+    const existingCount = await this.prisma.bankAccount.count({ where: { userId: ownerId } });
+    const makeDefault = dto.isDefault ?? existingCount === 0;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (makeDefault) {
+        await tx.bankAccount.updateMany({
+          where: { userId: ownerId, isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+      return tx.bankAccount.create({
+        data: {
+          userId: ownerId,
+          bankCode: dto.bankCode.trim().toUpperCase(),
+          accountNumber: dto.accountNumber.trim(),
+          accountHolder: dto.accountHolder.trim().toUpperCase(),
+          isDefault: makeDefault,
+        },
+      });
+    });
+  }
+
+  async setDefaultBankAccount(ownerId: string, id: string) {
+    const acc = await this.prisma.bankAccount.findUnique({ where: { id } });
+    if (!acc) throw new NotFoundException();
+    if (acc.userId !== ownerId) throw new ForbiddenException();
+    if (acc.isDefault) return acc;
+    return this.prisma.$transaction(async (tx) => {
+      await tx.bankAccount.updateMany({
+        where: { userId: ownerId, isDefault: true },
+        data: { isDefault: false },
+      });
+      return tx.bankAccount.update({ where: { id }, data: { isDefault: true } });
+    });
+  }
+
+  async deleteBankAccount(ownerId: string, id: string) {
+    const acc = await this.prisma.bankAccount.findUnique({ where: { id } });
+    if (!acc) throw new NotFoundException();
+    if (acc.userId !== ownerId) throw new ForbiddenException();
+    // Không cho xoá nếu đang là default duy nhất và còn pending earnings
+    if (acc.isDefault) {
+      const pending = await this.prisma.ownerEarning.count({
+        where: { ownerId, status: 'PENDING' },
+      });
+      if (pending > 0) {
+        throw new BadRequestException(
+          'Không thể xoá tài khoản mặc định khi còn earning đang chờ payout',
+        );
+      }
+    }
+    await this.prisma.bankAccount.delete({ where: { id } });
+    return { ok: true };
   }
 
   // ─────────────────── Helper: scope assertion ───────────────────

@@ -280,3 +280,41 @@ export async function requestPayout() {
   if (USE_MOCK) return;
   await ownerApi.requestPayout();
 }
+
+export async function createBankAccount(body: {
+  bankCode: string;
+  accountNumber: string;
+  accountHolder: string;
+  isDefault?: boolean;
+}) {
+  if (USE_MOCK) {
+    // Cập nhật mock state để UI reflect ngay
+    MOCK_PAYOUT.bankAccount = {
+      id: 'ba-mock',
+      bankCode: body.bankCode,
+      accountNumber: body.accountNumber,
+      accountHolder: body.accountHolder,
+    };
+    return;
+  }
+  await ownerApi.createBankAccount(body);
+}
+
+export async function listBankAccounts() {
+  if (USE_MOCK) return [];
+  return ownerApi.listBankAccounts();
+}
+
+export async function setDefaultBankAccount(id: string) {
+  if (USE_MOCK) return;
+  await ownerApi.setDefaultBankAccount(id);
+}
+
+export async function deleteBankAccount(id: string) {
+  if (USE_MOCK) {
+    MOCK_PAYOUT.bankAccount = null;
+    void id;
+    return;
+  }
+  await ownerApi.deleteBankAccount(id);
+}

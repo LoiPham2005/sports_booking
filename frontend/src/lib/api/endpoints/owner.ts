@@ -118,6 +118,22 @@ export interface PayoutSummary {
   }>;
 }
 
+export interface BankAccountDto {
+  id: string;
+  bankCode: string;
+  accountNumber: string;
+  accountHolder: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface UpsertBankAccountInput {
+  bankCode: string;
+  accountNumber: string;
+  accountHolder: string;
+  isDefault?: boolean;
+}
+
 // ─────────── API ───────────
 
 export const ownerApi = {
@@ -171,4 +187,12 @@ export const ownerApi = {
   payoutSummary: () => apiGet<PayoutSummary>('/owner/payout'),
 
   requestPayout: () => apiPost<unknown>('/owner/payout/request'),
+
+  listBankAccounts: () => apiGet<BankAccountDto[]>('/owner/bank-accounts'),
+  createBankAccount: (body: UpsertBankAccountInput) =>
+    apiPost<BankAccountDto>('/owner/bank-accounts', body),
+  setDefaultBankAccount: (id: string) =>
+    apiPatch<BankAccountDto>(`/owner/bank-accounts/${encodeURIComponent(id)}/default`),
+  deleteBankAccount: (id: string) =>
+    apiDelete<{ ok: boolean }>(`/owner/bank-accounts/${encodeURIComponent(id)}`),
 };

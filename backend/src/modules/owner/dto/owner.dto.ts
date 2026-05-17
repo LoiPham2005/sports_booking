@@ -1,12 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BookingStatus, VenueMemberRole, VenueMemberStatus } from '@prisma/client';
 import {
+  IsBoolean,
   IsDateString,
   IsEmail,
   IsEnum,
   IsNumber,
   IsOptional,
   IsString,
+  Length,
+  Matches,
   Min,
 } from 'class-validator';
 
@@ -51,6 +54,14 @@ export class ListBookingsQueryDto {
   @IsEnum(BookingStatus)
   status?: BookingStatus;
   @ApiPropertyOptional() @IsOptional() @IsString() venueId?: string;
+}
+
+export class UpsertBankAccountDto {
+  @ApiProperty() @IsString() @Length(2, 20) bankCode!: string;
+  @ApiProperty() @IsString() @Matches(/^[0-9]{6,20}$/, { message: 'Số tài khoản gồm 6-20 chữ số' })
+  accountNumber!: string;
+  @ApiProperty() @IsString() @Length(2, 100) accountHolder!: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isDefault?: boolean;
 }
 
 export class ReportsQueryDto {

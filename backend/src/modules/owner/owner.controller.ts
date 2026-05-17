@@ -20,6 +20,7 @@ import {
   RefuseBookingDto,
   ReportsQueryDto,
   UpdateStaffDto,
+  UpsertBankAccountDto,
 } from './dto/owner.dto';
 
 @ApiBearerAuth()
@@ -101,6 +102,27 @@ export class OwnerController {
   @Post('payout/request')
   payoutRequest(@CurrentUser() user: JwtUser) {
     return this.owner.requestPayout(user.sub);
+  }
+
+  // Bank accounts
+  @Get('bank-accounts')
+  listBankAccounts(@CurrentUser() user: JwtUser) {
+    return this.owner.listBankAccounts(user.sub);
+  }
+
+  @Post('bank-accounts')
+  createBankAccount(@CurrentUser() user: JwtUser, @Body() dto: UpsertBankAccountDto) {
+    return this.owner.upsertBankAccount(user.sub, dto);
+  }
+
+  @Patch('bank-accounts/:id/default')
+  setDefaultBankAccount(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.owner.setDefaultBankAccount(user.sub, id);
+  }
+
+  @Delete('bank-accounts/:id')
+  deleteBankAccount(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.owner.deleteBankAccount(user.sub, id);
   }
 }
 
