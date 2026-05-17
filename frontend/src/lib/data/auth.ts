@@ -12,11 +12,36 @@ import type { UiUser } from '@/lib/api/adapters/user';
 
 const MOCK_USER_KEY = 'sb_mock_user';
 
+/**
+ * In-memory cache cho user hiện tại — set ngay sau login để useCurrentUser
+ * không bị flash "logged-out" trong lúc chờ /me.
+ *
+ * - `undefined`: chưa từng fetch (sẽ gọi /me)
+ * - `null`: confirmed logged-out
+ * - `UiUser`: confirmed logged-in
+ */
+let cachedCurrentUser: UiUser | null | undefined = undefined;
+
+export function setCurrentUserCache(user: UiUser | null): void {
+  cachedCurrentUser = user;
+}
+
+export function getCurrentUserCache(): UiUser | null | undefined {
+  return cachedCurrentUser;
+}
+
 export async function logout(): Promise<void> {
   // Clear cache permissions (lazy import để tránh circular)
   try {
     const mod = await import('@/lib/use-permissions');
     mod.clearPermissionsCache();
+  } catch {
+    // ignore
+  }
+  cachedCurrentUser = null;
+  try {
+    const mod = await import('@/lib/use-staff-role');
+    mod.clearStaffRoleCache();
   } catch {
     // ignore
   }
@@ -43,17 +68,31 @@ export async function getCurrentUser(): Promise<UiUser | null> {
   if (USE_MOCK) {
     if (typeof window === 'undefined') return null;
     const raw = localStorage.getItem(MOCK_USER_KEY);
-    if (!raw) return null;
+    if (!raw) {
+      cachedCurrentUser = null;
+      return null;
+    }
     try {
-      return JSON.parse(raw) as UiUser;
+      const u = JSON.parse(raw) as UiUser;
+      cachedCurrentUser = u;
+      return u;
     } catch {
+      cachedCurrentUser = null;
       return null;
     }
   }
   try {
-    return await usersApi.me();
-  } catch {
-    return null;
+    const u = await usersApi.me();
+    cachedCurrentUser = u;
+    return u;
+  } catch (e) {
+    // Chỉ coi là logged-out khi server trả 401 sau khi đã thử refresh.
+    // Lỗi network/timeout → giữ cached user (nếu có) để tránh flash logged-out.
+    if (isApiError(e) && e.status === 401) {
+      cachedCurrentUser = null;
+      return null;
+    }
+    return cachedCurrentUser ?? null;
   }
 }
 

@@ -11,6 +11,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { Search, Download } from 'lucide-react';
 import { listAdminUsers, updateAdminUser } from '@/lib/data/admin';
 import { isApiError } from '@/lib/api/errors';
+import { useConfirm } from '@/components/ui/confirm';
 import type { AdminUserDto } from '@/lib/api/endpoints/admin';
 import type { Role, UserStatus } from '@/lib/api/types';
 
@@ -32,6 +33,7 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState<Role | ''>('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const confirm = useConfirm();
 
   // Reset về trang 1 khi filter đổi
   useEffect(() => {
@@ -69,10 +71,20 @@ export default function AdminUsersPage() {
 
   async function toggleStatus(u: AdminUserDto) {
     const next: UserStatus = u.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    const isSuspend = next === 'SUSPENDED';
+    const ok = await confirm({
+      title: isSuspend ? `Đình chỉ ${u.fullName}?` : `Kích hoạt lại ${u.fullName}?`,
+      description: isSuspend
+        ? 'User sẽ không đăng nhập / đặt sân được cho đến khi được kích hoạt lại.'
+        : 'User sẽ có thể đăng nhập và sử dụng dịch vụ trở lại.',
+      tone: isSuspend ? 'destructive' : 'default',
+      confirmText: isSuspend ? 'Đình chỉ' : 'Kích hoạt',
+    });
+    if (!ok) return;
     setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, status: next } : x)));
     try {
       await updateAdminUser(u.id, { status: next });
-      toast.success(next === 'SUSPENDED' ? 'Đã suspend' : 'Đã active lại');
+      toast.success(isSuspend ? 'Đã đình chỉ user' : 'Đã kích hoạt lại user');
     } catch (e) {
       toast.error(isApiError(e) ? e.message : 'Cập nhật thất bại');
       // Revert
@@ -81,7 +93,21 @@ export default function AdminUsersPage() {
   }
 
   async function changeRole(u: AdminUserDto, role: Role) {
-    if (!confirm(`Đổi role ${u.fullName} sang ${role}?`)) return;
+    if (role === u.role) return;
+    const isDangerous = role === 'ADMIN' || role === 'SUPER_ADMIN';
+    const ok = await confirm({
+      title: `Đổi role ${u.fullName}?`,
+      description: (
+        <>
+          Chuyển role từ <strong>{u.role}</strong> sang <strong>{role}</strong>.
+          {isDangerous && ' Role này có quyền quản trị cao — cân nhắc kỹ.'}
+        </>
+      ),
+      tone: isDangerous ? 'destructive' : 'warning',
+      confirmText: 'Đổi role',
+      requireText: isDangerous ? role : undefined,
+    });
+    if (!ok) return;
     setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role } : x)));
     try {
       await updateAdminUser(u.id, { role });
@@ -199,8 +225,12 @@ export default function AdminUsersPage() {
                     {new Date(u.createdAt).toLocaleDateString('vi-VN')}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Button size="sm" variant="ghost" onClick={() => toggleStatus(u)}>
-                      {u.status === 'ACTIVE' ? 'Suspend' : 'Unsuspend'}
+                    <Button
+                      size="sm"
+                      variant={u.status === 'ACTIVE' ? 'destructive' : 'outline'}
+                      onClick={() => toggleStatus(u)}
+                    >
+                      {u.status === 'ACTIVE' ? 'Đình chỉ' : 'Kích hoạt'}
                     </Button>
                   </td>
                 </tr>

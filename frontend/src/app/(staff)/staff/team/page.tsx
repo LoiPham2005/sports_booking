@@ -25,6 +25,7 @@ export default function StaffTeamPage() {
   );
 
   useEffect(() => {
+    if (role === undefined) return;
     if (role !== 'manager') {
       setLoading(false);
       return;
@@ -39,6 +40,9 @@ export default function StaffTeamPage() {
     };
   }, [role]);
 
+  if (role === undefined) {
+    return <div className="h-64 animate-pulse rounded-xl bg-muted/30" />;
+  }
   if (role !== 'manager') return <AccessDenied />;
 
   return (

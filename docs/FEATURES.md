@@ -121,8 +121,14 @@ Một **Venue** là 1 địa điểm vật lý (ví dụ "Sân bóng A Phú Mỹ
 - `POST /owner/venues/:id/hours` — giờ mở cửa theo thứ trong tuần + ngày lễ.
 
 ### Admin
-- `GET /admin/venues?status=PENDING` — duyệt venue mới.
+- `GET /admin/venues?status=PENDING|APPROVED|SUSPENDED` — list venue theo tab.
 - `POST /admin/venues/:id/approve` / `/reject` / `/suspend`.
+- UI `/admin/venues` hiển thị nút theo trạng thái:
+  - `PENDING` → **Duyệt** / **Từ chối** (từ chối mở custom prompt nhập lý do).
+  - `APPROVED` → **Đình chỉ** (custom confirm warning).
+  - `SUSPENDED` → **Khôi phục hoạt động** (dùng lại endpoint `approve`).
+- UI `/admin/users` — đổi role + đình chỉ user qua **custom confirm** (không dùng `window.confirm`): đổi sang ADMIN/SUPER_ADMIN yêu cầu user gõ chính xác tên role (`requireText`) để xác nhận hành động nguy hiểm.
+- UI `/admin/disputes` — 3 tab **Đang chờ / Đã duyệt / Đã từ chối** (filter `GET /admin/disputes?status=PENDING|SUCCESS|FAILED`). Tab lịch sử hiện đầy đủ thông tin booking/payment/khách hàng nhưng ẩn nút thao tác. Khi duyệt/từ chối mở **custom prompt** (textarea, max 500 ký tự) để nhập ghi chú — từ chối thì bắt buộc nhập lý do.
 
 ## 6. Courts (Sân con)
 

@@ -187,7 +187,7 @@ export class StaffService {
                COUNT(*)::int AS count
         FROM "Booking"
         WHERE "venueId" = ANY(${venueIds})
-          AND status = ANY(${successStatuses})
+          AND status::text = ANY(${successStatuses})
           AND "startsAt" >= ${day}
           AND "startsAt" < ${end}
         GROUP BY hour
@@ -201,7 +201,7 @@ export class StaffService {
              COUNT(*)::int AS count
       FROM "Booking"
       WHERE "venueId" = ANY(${venueIds})
-        AND status = ANY(${successStatuses})
+        AND status::text = ANY(${successStatuses})
         AND "startsAt" >= ${day}
         AND "startsAt" < ${end}
       GROUP BY "courtId"

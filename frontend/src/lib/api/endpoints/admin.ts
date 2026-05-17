@@ -125,7 +125,10 @@ export const adminApi = {
   updateUser: (id: string, body: { role?: Role; status?: UserStatus }) =>
     apiPatch<AdminUserDto>(`/admin/users/${encodeURIComponent(id)}`, body),
 
-  listDisputes: () => apiGet<AdminDisputeDto[]>('/admin/disputes'),
+  listDisputes: (params?: { status?: 'PENDING' | 'SUCCESS' | 'FAILED' }) =>
+    apiGet<AdminDisputeDto[]>('/admin/disputes', {
+      query: params as Record<string, string | undefined> | undefined,
+    }),
   resolveDispute: (id: string, body: { approve: boolean; amount?: number; note?: string }) =>
     apiPost<AdminDisputeDto>(`/admin/disputes/${encodeURIComponent(id)}/resolve`, body),
 

@@ -251,9 +251,9 @@ export class AdminService {
 
   // ─────────────────── Disputes / refunds ───────────────────
 
-  async listDisputes() {
+  async listDisputes(status?: RefundStatus) {
     return this.prisma.refund.findMany({
-      where: { status: RefundStatus.PENDING },
+      where: status ? { status } : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
         payment: {

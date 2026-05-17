@@ -10,7 +10,8 @@ import { authApi } from '@/lib/api/endpoints/auth';
 import { homePathByRole } from '@/lib/api/adapters/user';
 import { USE_MOCK } from '@/lib/api/config';
 import { isApiError } from '@/lib/api/errors';
-import { setMockUser } from '@/lib/data/auth';
+import { setMockUser, setCurrentUserCache } from '@/lib/data/auth';
+import { toUiUser } from '@/lib/api/adapters/user';
 import { notifyAuthChanged } from '@/lib/use-current-user';
 import type { Role } from '@/lib/api/types';
 
@@ -27,7 +28,8 @@ function LoginInner() {
     setSubmitting(true);
     try {
       const result = await authApi.login({ identifier: id, password: pwd });
-      // Cập nhật cache user (API mode — useCurrentUser sẽ refetch /me)
+      // Seed cache ngay để header/permissions phản ánh login state mà không cần chờ /me
+      setCurrentUserCache(toUiUser(result.user as Parameters<typeof toUiUser>[0]));
       notifyAuthChanged();
       toast.success(`Xin chào, ${result.user.fullName}`);
       router.replace(nextPath || homePathByRole(result.user.role));

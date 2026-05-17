@@ -10,7 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Search, MapPin } from 'lucide-react';
 import { Pagination } from '@/components/ui/pagination';
-import { listAdminVenues, approveVenue, rejectVenue } from '@/lib/data/admin';
+import { listAdminVenues, approveVenue, rejectVenue, suspendVenue } from '@/lib/data/admin';
+import { useConfirm } from '@/components/ui/confirm';
+import { usePrompt } from '@/components/ui/prompt';
 import { isApiError } from '@/lib/api/errors';
 import type { AdminVenueDto } from '@/lib/api/endpoints/admin';
 import type { VenueStatus } from '@/lib/api/types';
@@ -33,6 +35,8 @@ function AdminVenuesInner() {
   const searchParams = useSearchParams();
   const initialStatus = (searchParams.get('status') as VenueStatus) ?? 'PENDING';
 
+  const confirm = useConfirm();
+  const prompt = usePrompt();
   const [status, setStatus] = useState<VenueStatus | 'ALL'>(initialStatus);
   const [q, setQ] = useState('');
   const [venues, setVenues] = useState<AdminVenueDto[]>([]);
@@ -79,8 +83,55 @@ function AdminVenuesInner() {
     }
   }
 
+  async function handleSuspend(id: string, name: string) {
+    const ok = await confirm({
+      title: 'Đình chỉ venue?',
+      description: `Đình chỉ "${name}" — venue sẽ không nhận booking mới cho đến khi khôi phục.`,
+      tone: 'warning',
+      confirmText: 'Đình chỉ',
+    });
+    if (!ok) return;
+    setActingId(id);
+    try {
+      const updated = await suspendVenue(id);
+      setVenues((prev) => prev.map((v) => (v.id === id ? { ...v, status: updated.status } : v)));
+      toast.success('Đã đình chỉ venue');
+    } catch (e) {
+      toast.error(isApiError(e) ? e.message : 'Đình chỉ thất bại');
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  async function handleRestore(id: string, name: string) {
+    const ok = await confirm({
+      title: 'Khôi phục venue?',
+      description: `Khôi phục "${name}" về trạng thái hoạt động.`,
+      confirmText: 'Khôi phục',
+    });
+    if (!ok) return;
+    setActingId(id);
+    try {
+      const updated = await approveVenue(id);
+      setVenues((prev) => prev.map((v) => (v.id === id ? { ...v, status: updated.status } : v)));
+      toast.success('Đã khôi phục venue');
+    } catch (e) {
+      toast.error(isApiError(e) ? e.message : 'Khôi phục thất bại');
+    } finally {
+      setActingId(null);
+    }
+  }
+
   async function handleReject(id: string) {
-    const reason = prompt('Lý do từ chối (tuỳ chọn):');
+    const reason = await prompt({
+      title: 'Từ chối venue',
+      description: 'Nhập lý do từ chối để owner biết (tuỳ chọn).',
+      placeholder: 'VD: Hình ảnh thiếu rõ ràng, địa chỉ chưa xác minh...',
+      multiline: true,
+      maxLength: 500,
+      confirmText: 'Từ chối',
+    });
+    if (reason === null) return; // user cancel
     setActingId(id);
     try {
       await rejectVenue(id, reason || undefined);
@@ -188,6 +239,27 @@ function AdminVenuesInner() {
                         </Button>
                         <Button onClick={() => handleApprove(v.id)} disabled={actingId === v.id}>
                           {actingId === v.id ? 'Đang xử lý...' : 'Duyệt'}
+                        </Button>
+                      </div>
+                    )}
+                    {v.status === 'APPROVED' && (
+                      <div className="mt-4 flex gap-2">
+                        <Button
+                          variant="destructive"
+                          onClick={() => handleSuspend(v.id, v.name)}
+                          disabled={actingId === v.id}
+                        >
+                          {actingId === v.id ? 'Đang xử lý...' : 'Đình chỉ'}
+                        </Button>
+                      </div>
+                    )}
+                    {v.status === 'SUSPENDED' && (
+                      <div className="mt-4 flex gap-2">
+                        <Button
+                          onClick={() => handleRestore(v.id, v.name)}
+                          disabled={actingId === v.id}
+                        >
+                          {actingId === v.id ? 'Đang xử lý...' : 'Khôi phục hoạt động'}
                         </Button>
                       </div>
                     )}

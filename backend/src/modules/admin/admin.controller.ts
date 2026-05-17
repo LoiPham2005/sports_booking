@@ -8,7 +8,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+import { RefundStatus, Role } from '@prisma/client';
 import { CurrentUser, JwtUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RequirePermission } from '../../common/decorators/permissions.decorator';
@@ -84,8 +84,8 @@ export class AdminController {
   // Disputes
   @Get('disputes')
   @RequirePermission('dispute.resolve')
-  disputes() {
-    return this.admin.listDisputes();
+  disputes(@Query('status') status?: RefundStatus) {
+    return this.admin.listDisputes(status);
   }
 
   @Post('disputes/:id/resolve')

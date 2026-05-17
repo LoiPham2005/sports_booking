@@ -189,6 +189,15 @@ export async function rejectVenue(id: string, reason?: string): Promise<AdminVen
   return adminApi.rejectVenue(id, reason);
 }
 
+export async function suspendVenue(id: string): Promise<AdminVenueDto> {
+  if (USE_MOCK) {
+    const v = MOCK_VENUES.find((x) => x.id === id);
+    if (v) v.status = 'SUSPENDED';
+    return v as AdminVenueDto;
+  }
+  return adminApi.suspendVenue(id);
+}
+
 export async function listAdminUsers(params: {
   role?: Role;
   status?: UserStatus;
@@ -225,9 +234,14 @@ export async function updateAdminUser(
   return adminApi.updateUser(id, body);
 }
 
-export async function listDisputes(): Promise<AdminDisputeDto[]> {
-  if (USE_MOCK) return MOCK_DISPUTES;
-  return adminApi.listDisputes();
+export async function listDisputes(
+  params: { status?: 'PENDING' | 'SUCCESS' | 'FAILED' } = {},
+): Promise<AdminDisputeDto[]> {
+  if (USE_MOCK) {
+    if (!params.status) return MOCK_DISPUTES;
+    return MOCK_DISPUTES.filter((d) => d.status === params.status);
+  }
+  return adminApi.listDisputes(params);
 }
 
 export async function resolveDispute(

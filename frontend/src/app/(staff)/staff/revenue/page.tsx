@@ -9,29 +9,69 @@ import { Crown, TrendingUp, Download, Wallet, Activity } from 'lucide-react';
 import { formatVND } from '@/lib/format';
 import { useStaffRole } from '@/lib/use-staff-role';
 import { getRevenue } from '@/lib/data/staff';
+import { isApiError } from '@/lib/api/errors';
 import type { RevenueResponse } from '@/lib/api/endpoints/staff';
 
 export default function StaffRevenuePage() {
   const role = useStaffRole();
   const [data, setData] = useState<RevenueResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (role === undefined) return; // đang fetch role, đừng làm gì
     if (role !== 'manager') {
       setLoading(false);
       return;
     }
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     getRevenue()
-      .then((d) => !cancelled && setData(d))
-      .catch(() => {})
+      .then((d) => {
+        if (!cancelled) setData(d);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        if (isApiError(e) && e.status === 403) {
+          setError('Bạn không có quyền MANAGER ở venue nào. Liên hệ chủ sân để được gán quyền.');
+        } else {
+          setError(isApiError(e) ? e.message : 'Không tải được dữ liệu doanh thu');
+        }
+      })
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
   }, [role]);
 
+  if (role === undefined || loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-12 animate-pulse rounded bg-muted/30" />
+        <div className="grid gap-4 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-xl border bg-muted/30" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (role !== 'manager') return <AccessDenied />;
+
+  if (error) {
+    return (
+      <Card className="mx-auto max-w-md p-8 text-center">
+        <Crown className="mx-auto h-12 w-12 text-destructive" />
+        <h2 className="mt-4 text-xl font-bold">Không thể tải doanh thu</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+        <Button asChild className="mt-4" variant="outline">
+          <Link href="/staff">Về lịch hôm nay</Link>
+        </Button>
+      </Card>
+    );
+  }
 
   if (loading || !data) {
     return (

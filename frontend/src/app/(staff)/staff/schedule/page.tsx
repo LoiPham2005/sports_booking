@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatVND } from '@/lib/format';
 import { getStaffSchedule } from '@/lib/data/staff';
@@ -49,17 +49,12 @@ export default function StaffSchedulePage() {
           <p className="text-sm text-muted-foreground">Xem booking theo ngày</p>
         </div>
 
-        <div className="flex items-center gap-1 rounded-md border bg-card p-1">
-          <Button size="sm" variant="ghost" onClick={() => shiftDate(-1)}>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => shiftDate(-1)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-44 border-0"
-          />
-          <Button size="sm" variant="ghost" onClick={() => shiftDate(1)}>
+          <DatePicker value={date} onChange={setDate} className="w-44" align="end" />
+          <Button size="sm" variant="outline" onClick={() => shiftDate(1)}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

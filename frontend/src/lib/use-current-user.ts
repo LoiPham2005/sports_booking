@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getCurrentUser } from '@/lib/data/auth';
+import { getCurrentUser, getCurrentUserCache } from '@/lib/data/auth';
 import type { UiUser } from '@/lib/api/adapters/user';
 
 /**
@@ -16,7 +16,7 @@ import type { UiUser } from '@/lib/api/adapters/user';
  * custom event được dispatch (do login/logout trong cùng tab).
  */
 export function useCurrentUser(): UiUser | null | undefined {
-  const [user, setUser] = useState<UiUser | null | undefined>(undefined);
+  const [user, setUser] = useState<UiUser | null | undefined>(() => getCurrentUserCache());
 
   useEffect(() => {
     let cancelled = false;

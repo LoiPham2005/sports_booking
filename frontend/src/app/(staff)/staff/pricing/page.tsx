@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
+import { TimePicker24 } from '@/components/ui/time-picker';
 import { Crown, Plus, AlertTriangle, Trash2 } from 'lucide-react';
 import { useStaffRole } from '@/lib/use-staff-role';
 import { formatVND } from '@/lib/format';
@@ -32,6 +33,7 @@ export default function StaffPricingPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    if (role === undefined) return;
     if (role !== 'manager') {
       setLoading(false);
       return;
@@ -55,6 +57,9 @@ export default function StaffPricingPage() {
     };
   }, [venueId, role]);
 
+  if (role === undefined) {
+    return <div className="h-64 animate-pulse rounded-xl bg-muted/30" />;
+  }
   if (role !== 'manager') return <AccessDenied />;
 
   async function handleCreate() {
@@ -148,21 +153,11 @@ export default function StaffPricingPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="startTime">Từ</Label>
-              <Input
-                id="startTime"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
+              <TimePicker24 id="startTime" value={startTime} onChange={setStartTime} step={15} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="endTime">Đến</Label>
-              <Input
-                id="endTime"
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
+              <TimePicker24 id="endTime" value={endTime} onChange={setEndTime} step={15} />
             </div>
             <div className="space-y-1.5 md:col-span-3">
               <Label htmlFor="reason">Lý do (tuỳ chọn)</Label>

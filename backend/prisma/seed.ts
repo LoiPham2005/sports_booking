@@ -1,5 +1,9 @@
 import {
+  BookingStatus,
+  PaymentProvider,
+  PaymentStatus,
   PrismaClient,
+  RefundStatus,
   Role,
   Surface,
   VenueMemberRole,
@@ -93,7 +97,6 @@ async function main() {
   // Tránh warning unused (các account này hiện chỉ dùng để đăng nhập test)
   void superAdmin;
   void admin;
-  void customer;
 
   const badminton = await prisma.sport.findUniqueOrThrow({ where: { slug: 'badminton' } });
 
@@ -312,6 +315,78 @@ async function main() {
     }
   }
 
+  // ─────────── Disputes / refunds (PENDING — hiện ở /admin/disputes) ───────────
+  const demoCourt = await prisma.court.findFirstOrThrow({ where: { venueId: venue.id } });
+
+  const disputeSeeds = [
+    {
+      code: 'DSP00001',
+      provider: PaymentProvider.VNPAY,
+      amount: 700_000,
+      reason: 'Sân ngập nước sau mưa, không thể chơi như mô tả',
+      daysAgo: 2,
+    },
+    {
+      code: 'DSP00002',
+      provider: PaymentProvider.MOMO,
+      amount: 350_000,
+      reason: 'Chủ sân huỷ ngang sát giờ, không bố trí sân thay thế',
+      daysAgo: 1,
+    },
+    {
+      code: 'DSP00003',
+      provider: PaymentProvider.ZALOPAY,
+      amount: 480_000,
+      reason: 'Sân khác với hình ảnh quảng cáo, thiếu đèn buổi tối',
+      daysAgo: 4,
+    },
+  ];
+
+  for (const d of disputeSeeds) {
+    const existing = await prisma.booking.findUnique({ where: { code: d.code } });
+    if (existing) continue;
+
+    const startsAt = new Date(Date.now() - d.daysAgo * 24 * 3600_000);
+    const endsAt = new Date(startsAt.getTime() + 60 * 60_000);
+
+    const booking = await prisma.booking.create({
+      data: {
+        code: d.code,
+        userId: customer.id,
+        courtId: demoCourt.id,
+        venueId: venue.id,
+        startsAt,
+        endsAt,
+        status: BookingStatus.COMPLETED,
+        subtotal: d.amount,
+        total: d.amount,
+      },
+    });
+
+    const payment = await prisma.payment.create({
+      data: {
+        bookingId: booking.id,
+        userId: customer.id,
+        provider: d.provider,
+        amount: d.amount,
+        status: PaymentStatus.SUCCESS,
+        providerOrderId: `${d.code}-PAY`,
+        paidAt: startsAt,
+      },
+    });
+
+    await prisma.refund.create({
+      data: {
+        paymentId: payment.id,
+        amount: d.amount,
+        reason: d.reason,
+        status: RefundStatus.PENDING,
+        requestedById: customer.id,
+        createdAt: new Date(Date.now() - d.daysAgo * 24 * 3600_000),
+      },
+    });
+  }
+
   // eslint-disable-next-line no-console
   console.log(
     [
@@ -325,6 +400,7 @@ async function main() {
       '    staff@sportsbooking.local  / staff@1234   (STAFF + VenueMember.STAFF)',
       '    customer@sportsbooking.local / customer@1234 (CUSTOMER)',
       `- ${1 + extraVenues.length} venues at HCM with lat/lng for map`,
+      `- ${disputeSeeds.length} pending refund disputes (booking + payment + refund)`,
     ].join('\n'),
   );
 }

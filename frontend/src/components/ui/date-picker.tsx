@@ -192,6 +192,8 @@ interface DatePickerProps {
   min?: string;
   max?: string;
   clearable?: boolean;
+  /** Anchor popover relative to trigger. Default 'start' (popover-left = trigger-left). */
+  align?: 'start' | 'end';
 }
 
 export function DatePicker({
@@ -203,6 +205,7 @@ export function DatePicker({
   min,
   max,
   clearable,
+  align = 'start',
 }: DatePickerProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -263,7 +266,12 @@ export function DatePicker({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1.5 rounded-lg border bg-popover shadow-lg">
+        <div
+          className={cn(
+            'absolute top-full z-50 mt-1.5 rounded-lg border bg-popover shadow-lg',
+            align === 'end' ? 'right-0' : 'left-0',
+          )}
+        >
           <CalendarPanel
             viewYear={view.y}
             viewMonth={view.m}

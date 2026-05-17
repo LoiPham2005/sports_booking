@@ -1,12 +1,40 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Shield, Crown } from 'lucide-react';
+import {
+  CalendarDays,
+  ChevronLeft,
+  Crown,
+  DollarSign,
+  LayoutDashboard,
+  MapPin,
+  Shield,
+  Tag,
+  Users,
+} from 'lucide-react';
 import { LogoutButton } from '@/components/shared/logout-button';
 import { useStaffRole, withRole } from '@/lib/use-staff-role';
 import { Suspense } from 'react';
+import { cn } from '@/lib/utils';
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+  managerOnly?: boolean;
+}
+
+const NAV: NavItem[] = [
+  { href: '/staff', label: 'Hôm nay', icon: LayoutDashboard, exact: true },
+  { href: '/staff/schedule', label: 'Lịch sân', icon: CalendarDays },
+  { href: '/staff/revenue', label: 'Doanh thu', icon: DollarSign, managerOnly: true },
+  { href: '/staff/team', label: 'Nhân viên', icon: Users, managerOnly: true },
+  { href: '/staff/pricing', label: 'Giá tạm thời', icon: Tag, managerOnly: true },
+];
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -18,99 +46,133 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
 function StaffLayoutInner({ children }: { children: React.ReactNode }) {
   const role = useStaffRole();
+  const pathname = usePathname();
   const isManager = role === 'manager';
+  const isLoading = role === undefined;
+  const accent = isManager ? 'violet' : 'orange';
 
-  const navItems = [
-    { href: '/staff', label: 'Hôm nay', visible: true },
-    { href: '/staff/schedule', label: 'Lịch sân', visible: true },
-    { href: '/staff/revenue', label: 'Doanh thu', visible: isManager },
-    { href: '/staff/team', label: 'Nhân viên', visible: isManager },
-    { href: '/staff/pricing', label: 'Giá tạm thời', visible: isManager },
-  ];
+  // Khi đang load role, hiện đủ menu để tránh flash → ẩn dần khi confirmed STAFF
+  const visibleNav = NAV.filter((n) => !n.managerOnly || isManager || isLoading);
 
   return (
-    <div className="flex min-h-screen flex-col bg-muted/30">
-      <header className="sticky top-0 z-30 border-b bg-background shadow-sm">
-        <div className="container flex h-16 items-center gap-4">
-          <Link href={withRole('/staff', role)} className="flex items-center gap-2">
-            <div
-              className={`grid h-9 w-9 place-items-center rounded-lg text-white ${
-                isManager
-                  ? 'bg-gradient-to-br from-violet-500 to-violet-700'
-                  : 'bg-gradient-to-br from-accent to-orange-700'
-              }`}
-            >
-              {isManager ? <Crown className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-base font-bold">Staff Portal</span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Sports Booking
-              </span>
-            </div>
-          </Link>
+    <div className="flex min-h-screen bg-muted/30">
+      <aside className="hidden w-64 shrink-0 border-r bg-card lg:flex lg:flex-col">
+        <div className="flex h-16 items-center gap-2 border-b px-5">
+          <div
+            className={cn(
+              'grid h-8 w-8 place-items-center rounded-lg text-white',
+              isManager
+                ? 'bg-gradient-to-br from-violet-500 to-violet-700'
+                : 'bg-gradient-to-br from-accent to-orange-700',
+            )}
+          >
+            {isManager ? <Crown className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
+          </div>
+          <div>
+            <p className="text-sm font-bold">Staff Portal</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Sports Booking
+            </p>
+          </div>
+        </div>
 
+        <Link
+          href="/"
+          className="flex items-center gap-2 border-b px-5 py-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" /> Về trang chính
+        </Link>
+
+        <div className="border-b px-5 py-3">
           {isManager ? (
-            <Badge className="ml-2 border-transparent bg-violet-500/15 text-violet-700 dark:text-violet-300">
+            <Badge className="border-transparent bg-violet-500/15 text-violet-700 dark:text-violet-300">
               <Crown className="mr-1 h-3 w-3" /> MANAGER
             </Badge>
           ) : (
-            <Badge variant="accent" className="ml-2">STAFF</Badge>
+            <Badge variant="accent">
+              <Shield className="mr-1 h-3 w-3" /> STAFF
+            </Badge>
           )}
-
-          <div className="ml-4 hidden items-center gap-1.5 text-sm md:flex">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Đang trực tại</span>
-            <span className="font-semibold">Sân bóng đá Phú Mỹ Hưng</span>
+          <div className="mt-2 flex items-center gap-1.5 text-xs">
+            <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="font-semibold leading-tight">Sân bóng đá Phú Mỹ Hưng</span>
           </div>
+        </div>
 
-          <div className="ml-auto flex items-center gap-2">
-            {navItems
-              .filter((n) => n.visible)
-              .map((n) => (
-                <Link
-                  key={n.href}
-                  href={withRole(n.href, role)}
-                  className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  {n.label}
-                </Link>
-              ))}
-            <div className="mx-2 h-6 w-px bg-border" />
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          {visibleNav.map((item) => {
+            const Icon = item.icon;
+            const href = withRole(item.href, role);
+            const active = item.exact ? pathname === item.href : pathname?.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={href}
+                className={cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  active
+                    ? accent === 'violet'
+                      ? 'bg-violet-500/10 text-violet-600 dark:text-violet-300'
+                      : 'bg-accent/10 text-accent'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Demo: role switcher inline */}
+        <div className="border-t p-3">
+          <p className="mb-2 px-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+            Demo · đổi role
+          </p>
+          <div className="flex gap-1">
+            <Link
+              href="/staff"
+              className={cn(
+                'flex-1 rounded-md px-2 py-1.5 text-center text-[11px] font-bold transition-colors',
+                !isManager
+                  ? 'bg-accent text-white'
+                  : 'border text-muted-foreground hover:bg-muted',
+              )}
+            >
+              STAFF
+            </Link>
+            <Link
+              href="/staff?role=manager"
+              className={cn(
+                'flex-1 rounded-md px-2 py-1.5 text-center text-[11px] font-bold transition-colors',
+                isManager
+                  ? 'bg-violet-500 text-white'
+                  : 'border text-muted-foreground hover:bg-muted',
+              )}
+            >
+              MANAGER
+            </Link>
+          </div>
+        </div>
+      </aside>
+
+      <main className="flex-1">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b bg-background px-6">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold">Staff Portal</h1>
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              · {isManager ? 'Quản lý' : 'Nhân viên'} tại Sân bóng đá Phú Mỹ Hưng
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
             <Avatar className="h-9 w-9">
               <AvatarFallback>{isManager ? 'M' : 'S'}</AvatarFallback>
             </Avatar>
             <LogoutButton variant="ghost" iconOnlyOnMobile />
           </div>
-        </div>
-
-        {/* Demo: switch role inline */}
-        <div className="container -mt-1 flex items-center justify-end gap-2 pb-2">
-          <span className="text-[11px] text-muted-foreground">Demo:</span>
-          <Link
-            href="/staff"
-            className={`rounded-full px-2 py-0.5 text-[11px] font-bold transition-colors ${
-              !isManager
-                ? 'bg-accent text-white'
-                : 'border text-muted-foreground hover:bg-muted'
-            }`}
-          >
-            STAFF
-          </Link>
-          <Link
-            href="/staff?role=manager"
-            className={`rounded-full px-2 py-0.5 text-[11px] font-bold transition-colors ${
-              isManager
-                ? 'bg-violet-500 text-white'
-                : 'border text-muted-foreground hover:bg-muted'
-            }`}
-          >
-            MANAGER
-          </Link>
-        </div>
-      </header>
-
-      <main className="container flex-1 py-6">{children}</main>
+        </header>
+        <div className="p-6">{children}</div>
+      </main>
     </div>
   );
 }
