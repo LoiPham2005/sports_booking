@@ -383,6 +383,59 @@ npx prisma migrate dev --name phase4_owner
 - A11y check
 
 ### ✅ Đã xong gần đây
+
+#### Session UI polish + bug-fix sweep (cuối phase tích hợp)
+
+**Bug fixes nền tảng**
+- **Sidebar admin biến mất khi đang load user** — `useCurrentUser()` trả `undefined` lúc loading, hook `useMyPermissions` cũ coi `!user` là logged-out → set empty Set → mọi menu item filter bằng permission đều ẩn. Fix: phân biệt `undefined` (loading → giữ keys = `undefined`) vs `null` (logged-out → empty Set). Layout đã có sẵn fallback "show all when loading", giờ chạy đúng.
+- **`useMyPermissions` cache stale qua login lại** — `cachedKeys` module-level không invalidate khi user đổi (login lại as role khác → menu hiển thị theo user cũ). Fix: thêm `cachedUserId`, refetch khi `user.id` thay đổi.
+- **Header flash "Đăng nhập / Đăng ký"** sau khi login thành công — `notifyAuthChanged` → re-fetch `/me`, trong khoảng chờ user=null. Fix: thêm `cachedCurrentUser` module-level + `setCurrentUserCache()` ngay sau login response, `useCurrentUser` seed initial state từ cache. `getCurrentUser` chỉ trả null khi 401 thật sau refresh (network/timeout giữ user cũ → không flash logged-out).
+- **SQL `operator does not exist: "BookingStatus" = text`** — raw query `status = ANY(${successStatuses})` truyền `string[]` vào cột enum PostgreSQL. Fix: cast `status::text = ANY(...)` trong [staff.service.ts](../backend/src/modules/staff/staff.service.ts) (revenue byHour + byCourt) và [owner.service.ts](../backend/src/modules/owner/owner.service.ts) (reports series).
+- **`/staff/revenue` kẹt loading mãi mãi** — `.catch(() => {})` nuốt lỗi 403 khi user không phải MANAGER → `data` mãi null → skeleton vĩnh viễn. Fix: surface lỗi đầy đủ, 403 hiện "Bạn không có quyền MANAGER ở venue nào".
+- **Flash "Chỉ MANAGER được truy cập" khi đang load role** — `useStaffRole()` trả default `'staff'` lúc đang fetch memberships → AccessDenied render ngay tức thì. Fix: hook trả `StaffRole | undefined`, các page manager-only ([revenue](../frontend/src/app/(staff)/staff/revenue/page.tsx) / [team](../frontend/src/app/(staff)/staff/team/page.tsx) / [pricing](../frontend/src/app/(staff)/staff/pricing/page.tsx)) hiện skeleton khi role undefined.
+- **Spam fetch `/staff/memberships`** — Layout + mỗi page con dùng `useStaffRole` tự gọi riêng, ~4 request liên tiếp/navigation. Fix: cache module-level `cachedRole` + `inFlight` promise → 1 fetch / tab lifetime, auto clear khi logout qua `clearStaffRoleCache()` được gọi trong `auth.logout()`.
+- **`/staff/bookings/[id]` 403** — page gọi `/bookings/:id` (CUSTOMER scope) → staff không phải chủ booking nên 403. Thêm endpoint `GET /staff/bookings/:id` ở [staff.controller.ts](../backend/src/modules/staff/staff.controller.ts) + [service](../backend/src/modules/staff/staff.service.ts), verify user là VenueMember ACTIVE của venue chứa booking. Frontend đổi sang `staffApi.bookingDetail()`.
+- **Owner `/owner/reports` 400** — cùng lỗi enum cast như staff revenue. Đã fix bằng `status::text = ANY($2)`.
+
+**Tính năng UI/UX mới**
+- **Custom Prompt Dialog** — [components/ui/prompt.tsx](../frontend/src/components/ui/prompt.tsx) với `usePrompt()` hook + `<PromptProvider>` mount cùng cấp với ConfirmProvider. Props: `multiline` (textarea), `required`, `maxLength` (đếm ký tự), `placeholder`, `defaultValue`. Enter để submit (1 dòng), Esc/click ngoài huỷ. Trả `string | null`. Thay `window.prompt` tại `/admin/venues` (lý do từ chối), `/admin/disputes` (ghi chú duyệt/từ chối refund — từ chối bắt buộc nhập).
+- **DatePicker `align` prop** — thêm `align: 'start' | 'end'` để popover anchor theo mép phải khi trigger gần biên viewport (tránh tràn). Áp dụng ở `/staff/schedule`.
+- **Custom Confirm áp toàn app** — thay `window.confirm`/`window.prompt` ở:
+  - `/admin/users` — đổi role + đình chỉ user (role ADMIN/SUPER_ADMIN dùng `requireText` yêu cầu gõ tên role để xác nhận hành động nguy hiểm).
+  - `/admin/venues` — suspend/restore (custom confirm) + custom prompt cho lý do từ chối.
+  - `/admin/disputes` — duyệt/từ chối refund (multiline 500 ký tự, từ chối bắt buộc).
+  - `/staff/pricing` — xoá override (hiện rõ thông tin sân/ngày/giờ).
+  - `/owner/payout` — xoá tài khoản ngân hàng.
+- **Disputes có lịch sử** — `/admin/disputes` 3 tab **Đang chờ / Đã duyệt / Đã từ chối**, filter qua `GET /admin/disputes?status=PENDING|SUCCESS|FAILED`. Tab lịch sử ẩn nút thao tác, badge trạng thái màu khác (warning/success/destructive).
+- **Admin venues có UI suspend/restore** — [admin/venues/page.tsx](../frontend/src/app/(admin)/admin/venues/page.tsx) hiện nút theo tab: PENDING → Duyệt/Từ chối, APPROVED → **Đình chỉ**, SUSPENDED → **Khôi phục hoạt động** (dùng lại endpoint approve). Backend đã có sẵn `POST /admin/venues/:id/suspend` với permission `venue.suspend`.
+- **Staff Portal sidebar layout** — [staff/layout.tsx](../frontend/src/app/(staff)/staff/layout.tsx) chuyển từ horizontal header sang sidebar trái giống admin: logo + role badge, link "Về trang chính", section venue đang trực, nav với icon (Hôm nay / Lịch sân / Doanh thu / Nhân viên / Giá tạm thời), demo role switcher (STAFF/MANAGER) ở dưới cùng. Active state tô màu theo role: tím cho MANAGER, cam cho STAFF. Manager-only menu ẩn tự động khi role = staff hoặc còn loading.
+- **Native input → custom component ở các form còn sót**:
+  - `/staff/schedule` — `<DatePicker>` thay `input type="date"`, `align="end"`.
+  - `/staff/pricing` — `<TimePicker24>` (step 15') thay `input type="time"` (tránh UI AM/PM phụ thuộc locale).
+
+**Quản lý tài khoản nhận tiền (multi-bank)**
+- **Backend bank account CRUD** — [owner.controller.ts](../backend/src/modules/owner/owner.controller.ts) + [owner.service.ts](../backend/src/modules/owner/owner.service.ts) + [DTO](../backend/src/modules/owner/dto/owner.dto.ts):
+  - `GET /owner/bank-accounts` — list all (sort theo `isDefault DESC, createdAt DESC`).
+  - `POST /owner/bank-accounts` — tạo TK mới, validate (bankCode 2-20 ký tự, accountNumber regex `^[0-9]{6,20}$`, holder 2-100 ký tự). Auto set `isDefault=true` cho TK đầu tiên hoặc khi body truyền `isDefault=true` (transaction unset default cũ).
+  - `PATCH /owner/bank-accounts/:id/default` — switch TK mặc định (transaction unset cũ + set mới).
+  - `DELETE /owner/bank-accounts/:id` — chặn xoá TK default nếu còn pending earnings.
+- **Frontend `/owner/payout` redesign**:
+  - Layout stack dọc full-width thay vì 2-cột (tránh khoảng trắng thừa khi nhiều TK):
+    1. Card số dư (gradient + 3 stats).
+    2. Card "Tài khoản nhận tiền" — grid card responsive 1/2/3/4 cột (sm/lg/xl), mỗi TK hiển thị bank code + badge "Mặc định" (sao) + số TK + holder + nút "Đặt mặc định" / xoá.
+    3. Card "Lịch sử chuyển khoản".
+  - Dialog "Thêm tài khoản" với `<select>` 15 ngân hàng VN (VCB/TCB/BIDV/VTB/MBB/ACB/TPB/VPB/STB/Agribank/HDB/OCB/VIB/SHB/MSB) + input số TK (auto strip non-digit, maxLength 20) + input chủ TK (auto IN HOA). Validate client-side regex.
+  - `reload()` helper gọi parallel `getPayoutSummary()` + `listBankAccounts()` sau mỗi action để UI sync ngay.
+
+**Seed data mở rộng** ([prisma/seed.ts](../backend/prisma/seed.ts))
+- **3 disputes PENDING** ở demo venue: VNPAY 700k / MOMO 350k / ZALOPAY 480k — đầy đủ chuỗi Booking COMPLETED → Payment SUCCESS → Refund PENDING. Idempotent qua booking code unique (`DSP00001-3`).
+- **13 schedule bookings** cho `/staff/schedule` (hôm qua → +2 ngày) với mix status: COMPLETED, CHECKED_IN (đang chơi), CONFIRMED (sắp đến), PENDING_PAYMENT (chờ thanh toán), CANCELLED_BY_USER. Codes `SCH00001-13`. Có payment SUCCESS cho các booking đã thanh toán → `/staff/revenue` có data thật.
+- **3 price overrides** cho `/staff/pricing`: +2 ngày 17-22h 250k (Lễ), +5 ngày 06-12h 50k (giảm sốc), +7 ngày 18-21h 200k (Cuối tuần).
+
+---
+
+#### Trước session này
+
 - **RBAC permission enforce end-to-end** — trước đây UI cho admin tick/untick nhưng backend không check (decorative). Đã hoàn thiện:
   - **Backend cache**: `PermissionsService.hasPermission()` dùng `Map<Role, Set<string>>` in-memory, `loadCache()` lazy, `invalidateCache()` khi `updateRolePermissions` → O(1) không hit DB mỗi request.
   - **Endpoint `GET /me/permissions`** ([users.controller.ts](../backend/src/modules/users/users.controller.ts)) — user query keys của role mình. SUPER_ADMIN tự động trả toàn bộ.
@@ -424,17 +477,7 @@ npx prisma migrate dev --name phase4_owner
 - **Cascading Address Selector** — [components/venues/address-selector.tsx](../frontend/src/components/venues/address-selector.tsx) dùng `provinces.open-api.vn` (cache localStorage 30 ngày). 2 mode: format cũ (Tỉnh → Quận/Huyện → Xã) và mới sau cải cách 7/2025 (Tỉnh → Xã, flatten qua huyện). Auto-convert old → new khi user chọn đủ.
 - **Map Picker (OpenStreetMap)** — [components/venues/map-picker.tsx](../frontend/src/components/venues/map-picker.tsx) click để chọn lat/lng, kéo pin tinh chỉnh, nút "Vị trí của tôi" qua Geolocation API.
 - **Schema địa chỉ mới** — Venue có thêm `newCity`, `newWard`, `provinceCode`, `wardCode` (cột rõ ràng thay vì JSON, index nhanh). Giữ `city/district/ward` legacy để search backward-compat.
-- **Staff Portal sidebar layout** — [staff/layout.tsx](../frontend/src/app/(staff)/staff/layout.tsx) chuyển từ horizontal header sang sidebar trái giống admin: 256px (ẩn dưới `lg`), logo + role badge, link "Về trang chính", section venue đang trực, danh sách nav với icon, demo role switcher (STAFF/MANAGER) ở dưới. Active state tô màu theo role: tím cho MANAGER, cam cho STAFF. Manager-only menu (Doanh thu / Nhân viên / Giá tạm thời) ẩn tự động khi role = staff.
-- **`useStaffRole` cache + loading state** — [lib/use-staff-role.ts](../frontend/src/lib/use-staff-role.ts) trả `StaffRole | undefined` (undefined = đang fetch). Module-level cache `cachedRole` + `inFlight` promise → chỉ 1 fetch `/staff/memberships` / tab lifetime (tránh polling khi nhiều page con cùng dùng hook). Auto clear khi logout qua `clearStaffRoleCache()`. Các page manager-only (`revenue/team/pricing`) check `role === undefined` → skeleton; chỉ render AccessDenied khi confirmed `role === 'staff'`.
-- **Auth cache + race-free header** — [lib/data/auth.ts](../frontend/src/lib/data/auth.ts) thêm `cachedCurrentUser` set ngay khi login response trả về (qua `setCurrentUserCache`), nên Header không flash "Đăng nhập / Đăng ký" trong lúc chờ `/me`. `getCurrentUser` chỉ trả null khi 401 thật (sau refresh), lỗi network giữ user cũ. [`useCurrentUser`](../frontend/src/lib/use-current-user.ts) seed initial state từ cache để render đúng ngay frame đầu.
-- **`useMyPermissions` track user identity** — [lib/use-permissions.ts](../frontend/src/lib/use-permissions.ts) thêm `cachedUserId` để invalidate cache khi đổi user (login lại as role khác → menu sidebar không bị stale). Distinguish `user === undefined` (loading) vs `null` (logged-out) → tránh ẩn hết menu admin khi đang load user.
-- **Staff revenue: cast enum + show errors** — [staff.service.ts](../backend/src/modules/staff/staff.service.ts) raw SQL dùng `status::text = ANY(...)` để khớp với `BookingStatus[]` text params (trước báo `operator does not exist: "BookingStatus" = text`). Frontend [staff/revenue/page.tsx](../frontend/src/app/(staff)/staff/revenue/page.tsx) hiện rõ error message thay vì silent catch — 403 hiện "Bạn không có quyền MANAGER ở venue nào".
-- **Admin venues suspend/restore UI** — [admin/venues/page.tsx](../frontend/src/app/(admin)/admin/venues/page.tsx) thêm nút theo tab: APPROVED → **Đình chỉ** (confirm), SUSPENDED → **Khôi phục hoạt động** (dùng lại endpoint `approve`). Backend `POST /admin/venues/:id/suspend` đã có sẵn (perm `venue.suspend`), chỉ thiếu UI.
-- **Custom DatePicker / TimePicker / Confirm / Prompt thay native ở các form còn lại** — `/staff/schedule` dùng `<DatePicker>` thay `input type="date"`, `/staff/pricing` dùng `<TimePicker24>` thay `input type="time"` (tránh UI AM/PM khó dùng + locale browser khác nhau).
-- **Confirm Dialog dùng chung** — [components/ui/confirm.tsx](../frontend/src/components/ui/confirm.tsx) với `useConfirm()` hook + provider ở root. 4 tone (default/destructive/warning/info), hỗ trợ `requireText` cho action nguy hiểm. Đã thay `window.confirm` toàn app: admin logout, court delete, `/admin/venues` (suspend/restore), `/admin/users` (đổi role + đình chỉ user — role ADMIN/SUPER_ADMIN yêu cầu gõ tên role để xác nhận).
-- **Prompt Dialog dùng chung** — [components/ui/prompt.tsx](../frontend/src/components/ui/prompt.tsx) với `usePrompt()` hook + `<PromptProvider>` mount cùng cấp với ConfirmProvider. Hỗ trợ `multiline` (textarea), `required`, `maxLength` (đếm ký tự), `placeholder`, `defaultValue`, Enter để submit (1 dòng), Esc/click ngoài để huỷ. Trả `string | null`. Đã thay `window.prompt` tại `/admin/venues` (lý do từ chối) và `/admin/disputes` (ghi chú duyệt/từ chối refund — từ chối là bắt buộc nhập).
-- **Disputes có lịch sử** — `/admin/disputes` thêm 3 tab **Đang chờ / Đã duyệt / Đã từ chối**, filter qua `GET /admin/disputes?status=PENDING|SUCCESS|FAILED`. Tab lịch sử ẩn nút thao tác, hiển thị badge trạng thái.
-- **Seed disputes** — `prisma/seed.ts` thêm 3 dispute PENDING (VNPAY 700k / MOMO 350k / ZALOPAY 480k) với đầy đủ chuỗi Booking COMPLETED → Payment SUCCESS → Refund PENDING thuộc `customer@gmail.com`. Idempotent qua booking `code` unique.
+- **Confirm Dialog dùng chung** — [components/ui/confirm.tsx](../frontend/src/components/ui/confirm.tsx) với `useConfirm()` hook + provider ở root. 4 tone (default/destructive/warning/info), hỗ trợ `requireText` cho action nguy hiểm. (Chi tiết các nơi đã áp dụng: xem section session ở trên.)
 - **Logout button** — Admin layout có nút Đăng xuất + confirm + call `POST /auth/logout` qua data layer [lib/data/auth.ts](../frontend/src/lib/data/auth.ts) (mock-aware).
 - **Toast position** — đổi từ `top-center` → `top-right` ở root layout.
 - **Backend scripts mở rộng** — thêm `dev`, `db:push`, `db:seed`, `typecheck`, `format:check`, `lint:check`, `test:cov` vào [backend/package.json](../backend/package.json).

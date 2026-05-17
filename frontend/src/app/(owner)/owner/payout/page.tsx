@@ -161,108 +161,111 @@ export default function OwnerPayoutPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Pending balance */}
-        <Card className="overflow-hidden lg:col-span-2">
-          <div className="bg-gradient-to-br from-primary via-emerald-600 to-emerald-700 p-6 text-primary-foreground">
-            <p className="text-xs uppercase tracking-wide opacity-80">Số dư chờ thanh toán</p>
-            <p className="mt-1 text-4xl font-bold">{formatVND(data.pendingAmount)}</p>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-              <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">
-                {data.pendingCount} earning entry
-              </span>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={handleRequest}
-                disabled={requesting || data.pendingAmount === 0 || !data.bankAccount}
-              >
-                {requesting ? 'Đang gửi...' : 'Yêu cầu chuyển ngay'}
-              </Button>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 divide-x border-t">
-            <div className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Đã trả tổng</p>
-              <p className="mt-1 text-xl font-bold">{formatVND(data.paidTotal)}</p>
-            </div>
-            <div className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Lần payout</p>
-              <p className="mt-1 text-xl font-bold">{data.history.length}</p>
-            </div>
-            <div className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Chu kỳ</p>
-              <p className="mt-1 text-sm font-semibold">Tuần</p>
-            </div>
-          </div>
-        </Card>
-
-        {/* Bank accounts list */}
-        <Card className="p-6">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h3 className="font-bold">Tài khoản nhận tiền</h3>
-              <p className="text-xs text-muted-foreground">
-                {banks.length > 0 ? `${banks.length} tài khoản` : 'Chưa có tài khoản'}
-              </p>
-            </div>
-            <Button size="sm" variant="outline" onClick={openBankDialog}>
-              <Plus className="h-3.5 w-3.5" /> Thêm
+      {/* Pending balance — full width */}
+      <Card className="overflow-hidden">
+        <div className="bg-gradient-to-br from-primary via-emerald-600 to-emerald-700 p-6 text-primary-foreground">
+          <p className="text-xs uppercase tracking-wide opacity-80">Số dư chờ thanh toán</p>
+          <p className="mt-1 text-4xl font-bold">{formatVND(data.pendingAmount)}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">
+              {data.pendingCount} earning entry
+            </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleRequest}
+              disabled={requesting || data.pendingAmount === 0 || !data.bankAccount}
+            >
+              {requesting ? 'Đang gửi...' : 'Yêu cầu chuyển ngay'}
             </Button>
           </div>
+        </div>
+        <div className="grid grid-cols-3 divide-x border-t">
+          <div className="p-4 text-center">
+            <p className="text-xs text-muted-foreground">Đã trả tổng</p>
+            <p className="mt-1 text-xl font-bold">{formatVND(data.paidTotal)}</p>
+          </div>
+          <div className="p-4 text-center">
+            <p className="text-xs text-muted-foreground">Lần payout</p>
+            <p className="mt-1 text-xl font-bold">{data.history.length}</p>
+          </div>
+          <div className="p-4 text-center">
+            <p className="text-xs text-muted-foreground">Chu kỳ</p>
+            <p className="mt-1 text-sm font-semibold">Tuần</p>
+          </div>
+        </div>
+      </Card>
 
-          {banks.length === 0 ? (
-            <div className="mt-4 rounded-lg border border-dashed bg-muted/30 p-4 text-center">
-              <p className="text-sm font-semibold text-destructive">Chưa có tài khoản nào</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Cần ít nhất 1 TK để nhận payout
-              </p>
-            </div>
-          ) : (
-            <div className="mt-4 space-y-2">
-              {banks.map((b) => (
-                <div
-                  key={b.id}
-                  className={`rounded-lg border p-3 ${
-                    b.isDefault ? 'border-primary/40 bg-primary/5' : 'bg-muted/30'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <Building2 className="mt-0.5 h-7 w-7 shrink-0 text-primary" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold">{b.bankCode}</p>
-                        {b.isDefault && (
-                          <Badge variant="success" className="gap-1 text-[10px]">
-                            <Star className="h-2.5 w-2.5" /> Mặc định
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="font-mono text-sm">{b.accountNumber}</p>
-                      <p className="truncate text-xs text-muted-foreground">{b.accountHolder}</p>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex justify-end gap-1">
-                    {!b.isDefault && (
-                      <Button size="sm" variant="ghost" onClick={() => handleSetDefault(b)}>
-                        <Check className="h-3.5 w-3.5" /> Đặt mặc định
-                      </Button>
-                    )}
+      {/* Bank accounts — section riêng, grid 1/2/3 cột theo màn */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h3 className="font-bold">Tài khoản nhận tiền</h3>
+            <p className="text-xs text-muted-foreground">
+              {banks.length > 0
+                ? `${banks.length} tài khoản · TK mặc định nhận payout`
+                : 'Chưa có tài khoản — cần ít nhất 1 TK để nhận payout'}
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={openBankDialog}>
+            <Plus className="h-3.5 w-3.5" /> Thêm tài khoản
+          </Button>
+        </div>
+
+        {banks.length === 0 ? (
+          <div className="mt-4 rounded-lg border border-dashed bg-muted/30 p-8 text-center">
+            <Building2 className="mx-auto h-10 w-10 text-muted-foreground" />
+            <p className="mt-3 text-sm font-semibold text-destructive">Chưa có tài khoản nào</p>
+            <Button size="sm" className="mt-3" onClick={openBankDialog}>
+              <Plus className="h-3.5 w-3.5" /> Thêm tài khoản đầu tiên
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {banks.map((b) => (
+              <div
+                key={b.id}
+                className={`rounded-lg border p-3 transition-colors ${
+                  b.isDefault ? 'border-primary/50 bg-primary/5' : 'bg-muted/20 hover:bg-muted/40'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 shrink-0 text-primary" />
+                  <p className="text-sm font-bold">{b.bankCode}</p>
+                  {b.isDefault && (
+                    <Badge variant="success" className="ml-auto gap-1 text-[9px]">
+                      <Star className="h-2.5 w-2.5" /> Mặc định
+                    </Badge>
+                  )}
+                </div>
+                <p className="mt-2 font-mono text-sm">{b.accountNumber}</p>
+                <p className="truncate text-[11px] text-muted-foreground">{b.accountHolder}</p>
+                <div className="mt-2 flex items-center justify-end gap-0.5 border-t pt-2">
+                  {!b.isDefault && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => handleDeleteBank(b)}
-                      title="Xoá"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => handleSetDefault(b)}
                     >
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      <Check className="h-3 w-3" /> Đặt mặc định
                     </Button>
-                  </div>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0"
+                    onClick={() => handleDeleteBank(b)}
+                    title="Xoá"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* History */}
       <Card className="overflow-hidden">
