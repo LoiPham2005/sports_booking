@@ -305,7 +305,8 @@ export class AdminService {
   async reports(params: { from?: string; to?: string }) {
     const from = params.from ? new Date(params.from) : new Date(Date.now() - 30 * 24 * 3600_000);
     const to = params.to ? new Date(params.to) : new Date();
-    const success: BookingStatus[] = ['CONFIRMED', 'CHECKED_IN', 'COMPLETED'];
+    // Pass as text[] thay vì enum[] — Postgres không tự cast TS string[] sang `BookingStatus[]`.
+    const success: string[] = ['CONFIRMED', 'CHECKED_IN', 'COMPLETED'];
 
     const series = await this.prisma.$queryRaw<
       Array<{ day: Date; gmv: number; bookings: number }>
@@ -314,7 +315,7 @@ export class AdminService {
              COALESCE(SUM("total"), 0)::float AS gmv,
              COUNT(*)::int AS bookings
       FROM "Booking"
-      WHERE status = ANY(${success})
+      WHERE status::text = ANY(${success})
         AND "startsAt" >= ${from} AND "startsAt" < ${to}
       GROUP BY day ORDER BY day
     `;
@@ -325,7 +326,7 @@ export class AdminService {
              COUNT(*)::int AS count
       FROM "Booking" b
       INNER JOIN "Court" c ON c.id = b."courtId"
-      WHERE b.status = ANY(${success})
+      WHERE b.status::text = ANY(${success})
         AND b."startsAt" >= ${from} AND b."startsAt" < ${to}
       GROUP BY c."sportId"
     `;

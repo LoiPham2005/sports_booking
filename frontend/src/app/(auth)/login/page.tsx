@@ -210,6 +210,16 @@ const SEED_ACCOUNTS: SeedAccount[] = [
     path: '/admin',
     role: 'ADMIN',
   },
+
+  {
+    email: 'super@gmail.com',
+    password: '12345678',
+    label: 'Super Admin',
+    icon: '⚡',
+    color: 'text-purple-500 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/20',
+    path: '/admin',
+    role: 'SUPER_ADMIN',
+  },
 ];
 
 export default function LoginPage() {

@@ -11,19 +11,20 @@ import type { AdminReportsResponse } from '@/lib/api/endpoints/admin';
 export default function AdminReportsPage() {
   const [data, setData] = useState<AdminReportsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     getAdminReports()
       .then((d) => !cancelled && setData(d))
-      .catch(() => {})
+      .catch((e) => !cancelled && setError(e?.message ?? 'Không tải được báo cáo'))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (loading || !data) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="h-12 animate-pulse rounded bg-muted/30" />
@@ -34,6 +35,22 @@ export default function AdminReportsPage() {
         </div>
         <div className="h-64 animate-pulse rounded-xl border bg-muted/30" />
       </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <Card className="p-12 text-center">
+        <p className="text-base font-semibold text-destructive">
+          {error ?? 'Chưa có dữ liệu báo cáo'}
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Có thể chưa có booking hoàn thành trong khoảng thời gian này.
+        </p>
+        <Button className="mt-4" onClick={() => location.reload()}>
+          Tải lại
+        </Button>
+      </Card>
     );
   }
 
