@@ -225,7 +225,6 @@ function BookingNewInner() {
 
       // Step 2: create payment
       const provider = method.toUpperCase() as PaymentProvider;
-      const returnUrl = `${window.location.origin}/booking/result`;
 
       if (USE_MOCK) {
         // Mock: chuyển thẳng tới result success
@@ -233,10 +232,12 @@ function BookingNewInner() {
         return;
       }
 
+      // KHÔNG truyền `returnUrl` — để backend dùng ENV `*_RETURN_URL` trỏ về
+      // `/payments/return/{provider}` rồi backend tự normalize params + redirect
+      // sang FE `/booking/result?provider=...&code=...&orderId=...`.
       const payment = await paymentsApi.create({
         bookingId: booking.id,
         provider,
-        returnUrl,
       });
 
       if (payment.redirectUrl) {

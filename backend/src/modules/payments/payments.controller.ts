@@ -95,7 +95,12 @@ export class PaymentsController {
 
   @Public()
   @Get('return/momo')
-  momoReturn(@Query() query: any, @Res() res: Response) {
+  async momoReturn(@Query() query: any, @Res() res: Response) {
+    // Trong dev local, MoMo IPN không reach được localhost → return handler là cách
+    // duy nhất để update payment/booking status. Verify signature + xử lý kết quả.
+    await this.payments.handleCallback(PaymentProviderEnum.MOMO, query, {}).catch(() => {
+      // Silent — vẫn redirect FE; FE tự poll status nếu cần
+    });
     const web = this.cfg.get<string>('app.webUrl');
     res.redirect(
       `${web}/booking/result?provider=momo&orderId=${query.orderId}&code=${query.resultCode}`,
@@ -104,7 +109,8 @@ export class PaymentsController {
 
   @Public()
   @Get('return/zalopay')
-  zalopayReturn(@Query() query: any, @Res() res: Response) {
+  async zalopayReturn(@Query() query: any, @Res() res: Response) {
+    await this.payments.handleCallback(PaymentProviderEnum.ZALOPAY, query, {}).catch(() => {});
     const web = this.cfg.get<string>('app.webUrl');
     res.redirect(
       `${web}/booking/result?provider=zalopay&orderId=${query.apptransid}&status=${query.status}`,

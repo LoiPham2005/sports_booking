@@ -47,7 +47,9 @@ export class MomoProvider implements PaymentProvider {
     const orderId = input.providerOrderId;
     const orderInfo = input.description;
     const extraData = '';
-    const requestType = 'captureWallet';
+    // 'payWithMethod' = AIO (All-In-One) — user chọn ví MoMo / ATM / Visa/Master/JCB
+    // 'captureWallet' = chỉ QR ví MoMo
+    const requestType = 'payWithMethod';
     const amount = String(input.amount);
 
     const rawSignature =

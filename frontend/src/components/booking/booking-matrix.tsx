@@ -330,7 +330,7 @@ export function BookingMatrix({ venue }: { venue: UiVenue }) {
               <ArrowRight className="h-4 w-4" />
             </Link>
           ) : (
-            <span>
+            <span className="inline-flex items-center gap-2">
               <Wallet className="h-4 w-4" />
               Chọn ít nhất 1 ô để tiếp tục
             </span>
