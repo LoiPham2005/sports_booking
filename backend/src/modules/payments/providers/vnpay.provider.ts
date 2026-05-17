@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentProvider as PaymentProviderEnum, PaymentStatus } from '@prisma/client';
 import axios from 'axios';
@@ -30,8 +30,13 @@ export class VnpayProvider implements PaymentProvider {
   constructor(private cfg: ConfigService) {}
 
   async createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
-    const tmnCode = this.cfg.getOrThrow<string>('payments.vnpay.tmnCode');
-    const hashSecret = this.cfg.getOrThrow<string>('payments.vnpay.hashSecret');
+    const tmnCode = this.cfg.get<string>('payments.vnpay.tmnCode', '');
+    const hashSecret = this.cfg.get<string>('payments.vnpay.hashSecret', '');
+    if (!tmnCode || !hashSecret) {
+      throw new ServiceUnavailableException(
+        'Cổng thanh toán VNPay chưa được cấu hình trên server (VNPAY_TMN_CODE / VNPAY_HASH_SECRET rỗng). Vui lòng chọn cổng khác hoặc liên hệ admin.',
+      );
+    }
     const payUrl = this.cfg.getOrThrow<string>('payments.vnpay.payUrl');
     const returnUrl = this.cfg.getOrThrow<string>('payments.vnpay.returnUrl');
 

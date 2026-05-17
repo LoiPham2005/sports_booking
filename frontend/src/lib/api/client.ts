@@ -117,7 +117,10 @@ export async function request<T = unknown>(path: string, options: RequestOptions
       // Retry lần 2 với skipRefresh để tránh loop.
       return request<T>(path, { ...options, skipRefresh: true });
     } catch {
-      // Refresh fail — throw 401 gốc để UI redirect login.
+      // Refresh fail — phiên hết hạn. Notify để header refetch và update UI sang logged-out.
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth-changed'));
+      }
     }
   }
 

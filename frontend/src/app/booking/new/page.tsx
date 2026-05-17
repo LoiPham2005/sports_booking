@@ -16,7 +16,7 @@ import { PaymentMethodPicker, type PaymentMethodKey } from '@/components/booking
 import { USE_MOCK } from '@/lib/api/config';
 import { bookingsApi, type QuoteResponse } from '@/lib/api/endpoints/bookings';
 import { paymentsApi } from '@/lib/api/endpoints/payments';
-import { getVenue } from '@/lib/data/venues';
+import { getVenue, getAvailability } from '@/lib/data/venues';
 import { isApiError } from '@/lib/api/errors';
 import type { UiVenue } from '@/lib/api/adapters/venue';
 import type { PaymentProvider } from '@/lib/api/types';
@@ -56,6 +56,16 @@ function nextHour(hhmm: string): string {
   return `${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+/** Check các giờ đã sort có liên tiếp không (mỗi giờ = giờ trước + 1). */
+function isConsecutive(sortedHours: string[]): boolean {
+  for (let i = 1; i < sortedHours.length; i++) {
+    const prev = parseInt(sortedHours[i - 1].split(':')[0], 10);
+    const cur = parseInt(sortedHours[i].split(':')[0], 10);
+    if (cur !== prev + 1) return false;
+  }
+  return true;
+}
+
 function BookingNewInner() {
   const router = useRouter();
   const params = useSearchParams();
@@ -78,7 +88,7 @@ function BookingNewInner() {
   const [secondsLeft, setSecondsLeft] = useState(HOLD_TTL_SECONDS);
   const startTime = useRef<number | null>(null);
 
-  // Fetch venue info + quote on mount
+  // Fetch venue info + tính giá per slot (hỗ trợ non-consecutive)
   useEffect(() => {
     if (!venueId || !parsedSlots) {
       setQuoteError('Thiếu thông tin sân hoặc khung giờ');
@@ -92,41 +102,76 @@ function BookingNewInner() {
       if (cancelled) return;
       setVenue(v);
 
-      if (USE_MOCK) {
-        // Mock quote — không gọi API
-        const subtotal = parsedSlots.hours.length * 350000;
-        setQuote({
-          courtId: parsedSlots.courtId,
-          startsAt: toIso(date, parsedSlots.hours[0]),
-          endsAt: toIso(date, nextHour(parsedSlots.hours[parsedSlots.hours.length - 1])),
-          slots: parsedSlots.hours.map((h) => ({
-            startsAt: toIso(date, h),
-            endsAt: toIso(date, nextHour(h)),
-            price: 350000,
-          })),
-          subtotal,
-          discount: 0,
-          total: subtotal,
-          holdToken: 'mock-hold-token',
-        });
-        startTime.current = Date.now();
-        setQuoting(false);
-        return;
-      }
-
       try {
-        const startsAt = toIso(date, parsedSlots.hours[0]);
-        const endsAt = toIso(date, nextHour(parsedSlots.hours[parsedSlots.hours.length - 1]));
-        const q = await bookingsApi.quote({
-          courtId: parsedSlots.courtId,
-          startsAt,
-          endsAt,
-        });
+        // Lấy availability để biết giá từng slot user đã chọn (chính xác theo PriceRule)
+        const avail = await getAvailability(venueId, date);
+        const court = avail.courts.find((c) => c.id === parsedSlots.courtId);
+        if (!court) throw new Error('Sân không tồn tại trong ngày này');
+
+        const slotInfos: { startsAt: string; endsAt: string; price: number; hour: string }[] = [];
+        for (const h of parsedSlots.hours) {
+          const cell = court.cells.find((c) => c.hour === h);
+          if (!cell) {
+            throw new Error(`Không tìm thấy giá cho khung ${h}`);
+          }
+          if (cell.status !== 'available') {
+            throw new Error(`Khung ${h} không còn trống (${cell.status}). Vui lòng chọn lại.`);
+          }
+          slotInfos.push({
+            startsAt: cell.startsAt,
+            endsAt: cell.endsAt,
+            price: cell.price,
+            hour: h,
+          });
+        }
+
+        const subtotal = slotInfos.reduce((s, x) => s + x.price, 0);
+
+        if (USE_MOCK) {
+          setQuote({
+            courtId: parsedSlots.courtId,
+            startsAt: slotInfos[0].startsAt,
+            endsAt: slotInfos[slotInfos.length - 1].endsAt,
+            slots: slotInfos.map(({ startsAt, endsAt, price }) => ({ startsAt, endsAt, price })),
+            subtotal,
+            discount: 0,
+            total: subtotal,
+            holdToken: 'mock-hold-token',
+          });
+          startTime.current = Date.now();
+          setQuoting(false);
+          return;
+        }
+
+        // API mode: gọi quote thật cho từng slot (backend chỉ chấp nhận 1 range/lần).
+        // Aggregate response → 1 quote tổng để UI hiển thị.
+        const responses = await Promise.all(
+          slotInfos.map((s) =>
+            bookingsApi.quote({
+              courtId: parsedSlots.courtId,
+              startsAt: s.startsAt,
+              endsAt: s.endsAt,
+            }),
+          ),
+        );
         if (cancelled) return;
-        setQuote(q);
+
+        const aggregated: QuoteResponse = {
+          courtId: parsedSlots.courtId,
+          startsAt: slotInfos[0].startsAt,
+          endsAt: slotInfos[slotInfos.length - 1].endsAt,
+          slots: responses.flatMap((r) => r.slots),
+          subtotal: responses.reduce((s, r) => s + r.subtotal, 0),
+          discount: 0,
+          total: responses.reduce((s, r) => s + r.total, 0),
+          // Lưu nhiều holdToken (1 per slot) để khi tạo booking gọi cho từng cái.
+          // Frontend sẽ join lại bằng "|" cho gọn.
+          holdToken: responses.map((r) => r.holdToken).join('|'),
+        };
+        setQuote(aggregated);
         startTime.current = Date.now();
       } catch (e) {
-        const msg = isApiError(e) ? e.message : 'Không thể báo giá';
+        const msg = isApiError(e) ? e.message : (e as Error).message || 'Không thể báo giá';
         setQuoteError(msg);
       } finally {
         setQuoting(false);
@@ -163,10 +208,20 @@ function BookingNewInner() {
     if (!quote) return;
     setPaying(true);
     try {
-      // Step 1: create booking from hold
-      const booking = USE_MOCK
-        ? { id: 'mock-booking-id', code: '20260547' }
-        : await bookingsApi.create({ holdToken: quote.holdToken, notes: note });
+      // Step 1: create booking từ hold token(s). Nhiều slot → nhiều holdToken (join "|").
+      // Lấy booking đầu tiên làm "primary" để link payment; các booking khác cũng tạo nhưng
+      // hiện flow Phase 2 chỉ thanh toán 1 booking. Multi-slot fully isolated bookings cần
+      // backend hỗ trợ multi-payment — TODO.
+      let booking: { id: string; code: string };
+      if (USE_MOCK) {
+        booking = { id: 'mock-booking-id', code: '20260547' };
+      } else {
+        const tokens = quote.holdToken.split('|').filter(Boolean);
+        const created = await Promise.all(
+          tokens.map((t) => bookingsApi.create({ holdToken: t, notes: note })),
+        );
+        booking = created[0];
+      }
 
       // Step 2: create payment
       const provider = method.toUpperCase() as PaymentProvider;
@@ -197,6 +252,11 @@ function BookingNewInner() {
       // Edge case: provider trả về cả 2 đều null
       toast.error('Không lấy được link thanh toán');
     } catch (e) {
+      if (isApiError(e) && e.status === 401) {
+        toast.error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại');
+        router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+        return;
+      }
       const msg = isApiError(e) ? e.message : 'Thanh toán thất bại';
       toast.error(msg);
     } finally {
@@ -350,8 +410,41 @@ function BookingNewInner() {
                     year: 'numeric',
                   })}
                 />
-                <DetailRow label="Khung giờ" value={`${startHHmm} – ${endHHmm} (${hoursCount} giờ)`} />
-                <DetailRow label="Đơn giá trung bình" value={`${formatVND(Math.round(quote.subtotal / hoursCount))}/h`} />
+                {/* Liệt kê từng slot user đã chọn */}
+                <div className="rounded-lg border bg-card">
+                  <div className="flex items-center justify-between border-b px-4 py-2">
+                    <span className="text-sm font-semibold">
+                      Khung giờ đã chọn ({hoursCount} slot)
+                    </span>
+                    <span className="text-xs text-muted-foreground">Giá / slot</span>
+                  </div>
+                  <ul className="divide-y">
+                    {quote.slots.map((s, i) => {
+                      const sh = new Date(s.startsAt).toLocaleTimeString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                      });
+                      const eh = new Date(s.endsAt).toLocaleTimeString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                      });
+                      return (
+                        <li key={i} className="flex items-center justify-between px-4 py-2 text-sm">
+                          <span className="font-mono">
+                            <span className="text-muted-foreground">#{i + 1}</span> · {sh} – {eh}
+                          </span>
+                          <span className="font-semibold">{formatVND(s.price)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <div className="flex items-center justify-between border-t bg-muted/30 px-4 py-2 text-sm">
+                    <span className="text-muted-foreground">Tổng {hoursCount} slot</span>
+                    <span className="font-bold text-primary">{formatVND(quote.subtotal)}</span>
+                  </div>
+                </div>
 
                 <div>
                   <label className="text-sm font-medium">Ghi chú cho chủ sân (tuỳ chọn)</label>
@@ -372,7 +465,8 @@ function BookingNewInner() {
                   </ul>
                 </div>
 
-                <Button size="lg" className="w-full md:w-auto" onClick={() => setStep(1)}>
+                {/* Trên mobile: hiện button inline. Trên desktop: button nằm ở sidebar Tóm tắt. */}
+                <Button size="lg" className="w-full md:hidden" onClick={() => setStep(1)}>
                   Tiếp tục đến thanh toán <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -395,7 +489,8 @@ function BookingNewInner() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
+                {/* Mobile only — desktop button ở sidebar Tóm tắt */}
+                <div className="flex flex-wrap gap-3 md:hidden">
                   <Button variant="outline" onClick={() => setStep(0)} disabled={paying}>
                     <ArrowLeft className="h-4 w-4" /> Quay lại
                   </Button>
@@ -420,11 +515,8 @@ function BookingNewInner() {
 
               <dl className="mt-4 space-y-2 text-sm">
                 <SummaryRow label="Sân" value={parsedSlots!.courtId} />
-                <SummaryRow
-                  label="Thời gian"
-                  value={`${new Date(date).toLocaleDateString('vi-VN')} · ${startHHmm}–${endHHmm}`}
-                />
-                <SummaryRow label="Số giờ" value={`${hoursCount} giờ`} />
+                <SummaryRow label="Ngày" value={new Date(date).toLocaleDateString('vi-VN')} />
+                <SummaryRow label="Số slot" value={`${hoursCount} slot`} />
               </dl>
 
               <div className="my-4 border-t" />
@@ -457,6 +549,36 @@ function BookingNewInner() {
               >
                 <Clock className="h-3.5 w-3.5" />
                 Giữ chỗ sẽ hết hạn sau {timerStr}
+              </div>
+
+              {/* CTA — desktop: ngay dưới khung tóm tắt cho dễ nhấn */}
+              <div className="mt-4 hidden md:block">
+                {step === 0 ? (
+                  <Button size="lg" className="w-full" onClick={() => setStep(1)}>
+                    Tiếp tục đến thanh toán <ChevronRight className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <Button size="lg" className="w-full" onClick={handlePay} disabled={paying}>
+                      {paying ? (
+                        'Đang tạo giao dịch...'
+                      ) : (
+                        <>
+                          Thanh toán {formatVND(quote.total)}
+                          <ChevronRight className="h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full"
+                      onClick={() => setStep(0)}
+                      disabled={paying}
+                    >
+                      <ArrowLeft className="h-4 w-4" /> Quay lại xem
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </aside>

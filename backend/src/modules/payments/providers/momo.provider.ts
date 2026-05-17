@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentProvider as PaymentProviderEnum, PaymentStatus } from '@prisma/client';
 import axios from 'axios';
@@ -31,10 +31,15 @@ export class MomoProvider implements PaymentProvider {
   constructor(private cfg: ConfigService) {}
 
   async createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
-    const partnerCode = this.cfg.getOrThrow<string>('payments.momo.partnerCode');
-    const accessKey = this.cfg.getOrThrow<string>('payments.momo.accessKey');
-    const secretKey = this.cfg.getOrThrow<string>('payments.momo.secretKey');
-    const endpoint = this.cfg.getOrThrow<string>('payments.momo.endpoint');
+    const partnerCode = this.cfg.get<string>('payments.momo.partnerCode', '');
+    const accessKey = this.cfg.get<string>('payments.momo.accessKey', '');
+    const secretKey = this.cfg.get<string>('payments.momo.secretKey', '');
+    const endpoint = this.cfg.get<string>('payments.momo.endpoint', '');
+    if (!partnerCode || !accessKey || !secretKey || !endpoint) {
+      throw new ServiceUnavailableException(
+        'Cổng thanh toán MoMo chưa được cấu hình trên server (MOMO_PARTNER_CODE / MOMO_ACCESS_KEY / MOMO_SECRET_KEY rỗng). Vui lòng chọn cổng khác hoặc liên hệ admin.',
+      );
+    }
     const redirectUrl = input.returnUrl ?? this.cfg.getOrThrow<string>('payments.momo.returnUrl');
     const ipnUrl = this.cfg.getOrThrow<string>('payments.momo.notifyUrl');
 
