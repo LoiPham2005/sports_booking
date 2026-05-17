@@ -66,9 +66,12 @@ Tài liệu liệt kê đầy đủ chức năng của backend (NestJS). Mỗi m
 - Roles: `CUSTOMER`, `OWNER` (chủ sân), `STAFF` (nhân viên), `ADMIN`, `SUPER_ADMIN`.
 - RBAC role-based bằng `@Roles()` + `RolesGuard` (vào theo role).
 - **Permission-based (động)**: bảng `Permission` + `RolePermission` cho phép SUPER_ADMIN bật/tắt quyền chi tiết cho từng role qua UI mà không cần deploy lại.
-  - Guard: `@RequirePermission('key')` + `PermissionsGuard`.
+  - Guard: `@RequirePermission('key')` + `PermissionsGuard` đã **register global** trong `AppModule` (cùng cấp JwtAuthGuard/RolesGuard). Mọi route gắn decorator đều enforce tự động.
+  - **Cache in-memory** trong `PermissionsService`: `Map<Role, Set<string>>` load lazy, invalidate khi `updateRolePermissions`. Không hit DB mỗi request.
   - SUPER_ADMIN luôn pass mọi permission check; không cho phép sửa permission của SUPER_ADMIN từ UI để tránh tự khóa.
   - 23 permission mặc định seed lần đầu (Venue/Booking/User/Voucher/Payout/Dispute/Report/Audit/System).
+  - Đã apply `@RequirePermission` cho: **AdminController** (venue.list/approve/reject/suspend, user.list/suspend, dispute.resolve, report.view, audit.view) + **VouchersController** (voucher.create/update/delete). Các module khác có thể bổ sung khi cần.
+  - **Frontend**: hook `useHasPermission(key)` để conditional render UI. Sidebar admin tự ẩn menu khi user không có quyền tương ứng.
 - OWNER chỉ thao tác được trên Venue mà họ sở hữu (scope guard).
 - STAFF được OWNER cấp quyền theo từng venue (`VenueMember` table). `VenueMember.role` có 2 mức:
   - **MANAGER** — đặt giá, xem báo cáo doanh thu, quản lý nhân viên của venue.
@@ -80,7 +83,8 @@ Tài liệu liệt kê đầy đủ chức năng của backend (NestJS). Mỗi m
 - `POST /admin/owners/:id/approve` & `/reject` — admin duyệt.
 - `GET /system/permissions` — list toàn bộ permission (auto-seed lần đầu).
 - `GET /system/permissions/matrix` — trả về `{ roles, permissions, grants }` để render bảng tích chọn.
-- `PUT /system/permissions/:role` — body `{ keys: string[] }`, replace toàn bộ permission của role. Ghi `AuditLog` với action `ROLE_PERMISSIONS_UPDATE`. **SUPER_ADMIN only**.
+- `PUT /system/permissions/:role` — body `{ keys: string[] }`, replace toàn bộ permission của role. Ghi `AuditLog` với action `ROLE_PERMISSIONS_UPDATE`. Tự invalidate cache. **SUPER_ADMIN only**.
+- `GET /me/permissions` — trả `{ role, keys: string[] }` cho user hiện tại. Frontend dùng để conditional render UI qua `useHasPermission()`.
 
 ## 4. Sports & Categories
 
@@ -201,7 +205,10 @@ ALTER TABLE "Booking"
 
 ### Providers
 - **VNPay** — redirect tới `vnpayment.vn`, callback qua IPN URL + Return URL. Verify `vnp_SecureHash` (HMAC-SHA512).
-- **MoMo** — One-time payment (AIO v2), callback IPN. Verify chữ ký HMAC-SHA256.
+- **MoMo** — One-time payment (AIO v2) với `requestType=payWithMethod` (user chọn ví/ATM/Visa-Master/JCB). Callback IPN, verify HMAC-SHA256.
+- **Return handler** (`/api/v1/payments/return/{provider}`) gọi `handleCallback()`: verify chữ ký → `markSuccess()` update `Payment.status=SUCCESS` + `Booking.status=CONFIRMED` + tạo `OwnerEarning` (split commission). Idempotent qua `PaymentEvent` table.
+- **Missing config**: nếu `MOMO_PARTNER_CODE`/`VNPAY_TMN_CODE`/... rỗng → throw `ServiceUnavailableException` (503) với message tiếng Việt clear. ZaloPay đã có credential sandbox public sẵn trong `.env.example`.
+- **ENV note**: `*_RETURN_URL`/`*_NOTIFY_URL`/`*_CALLBACK_URL` **PHẢI có prefix `/api/v1`** vì backend `setGlobalPrefix('api/v1')`.
 - **ZaloPay** — Order create, callback verify `mac` HMAC-SHA256.
 - Có thể thêm: **Stripe** (thẻ quốc tế), **Bank transfer** (manual).
 

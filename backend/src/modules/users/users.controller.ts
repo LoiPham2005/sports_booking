@@ -3,16 +3,27 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, JwtUser } from '../../common/decorators/current-user.decorator';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UsersService } from './users.service';
+import { PermissionsService } from '../system/permissions.service';
 
 @ApiBearerAuth()
 @ApiTags('me')
 @Controller('me')
 export class UsersController {
-  constructor(private users: UsersService) {}
+  constructor(
+    private users: UsersService,
+    private permissions: PermissionsService,
+  ) {}
 
   @Get()
   me(@CurrentUser() user: JwtUser) {
     return this.users.me(user.sub);
+  }
+
+  /** Trả về list permission keys mà role hiện tại của user có. */
+  @Get('permissions')
+  async myPermissions(@CurrentUser() user: JwtUser) {
+    const keys = await this.permissions.listKeysForRole(user.role);
+    return { role: user.role, keys };
   }
 
   @Patch()

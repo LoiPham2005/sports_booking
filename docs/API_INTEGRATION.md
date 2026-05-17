@@ -70,6 +70,15 @@
 | — | — | `lat`, `lng` | `Decimal?` | ✅ | Map view dùng — `VenueDto.lat/lng` (number\|null) → `UiVenue.lat/lng` qua `toUiVenue`. Mock data đã có toạ độ HCM thật. Seed backend tạo 7 venue có lat/lng. |
 | — | — | `newCity`, `newWard`, `provinceCode`, `wardCode` | `String?` | 🆕 | Địa chỉ sau cải cách 7/2025. Frontend gửi qua `CreateVenueDto` khi tạo venue qua `<AddressSelector>` cascading dropdown. Backend lưu thẳng các cột này (không JSON). |
 
+## Admin Reports (`GET /admin/reports?from=&to=`)
+
+Trả về `{ from, to, series: [{ day, gmv, bookings }], bySport: [{ sport, slug, total, count }] }`.
+
+- **Filter theo `createdAt`** (ngày tạo booking) chứ KHÔNG phải `startsAt` (ngày chơi) — vì báo cáo doanh thu = dòng tiền, không phải lịch sử dụng sân
+- **Group theo NGÀY VN (UTC+7)** — backend convert `createdAt` sang VN timezone trước khi group bằng cách `getTime() + 7*3600_000` rồi lấy YYYY-MM-DD
+- **Aggregate in-memory** (không dùng raw SQL `GROUP BY date_trunc`) để tránh timezone ambiguity + cùng dataset cho `series` và `bySport` không bị drift
+- Frontend `fillMissingDays(from, to, series)` fill ngày trống với gmv=0 → chart 30 cột thay vì 1 cột
+
 ## Storage (Supabase)
 
 Backend dùng `@supabase/supabase-js` thay AWS S3 SDK cho upload media. ENV:

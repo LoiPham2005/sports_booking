@@ -11,6 +11,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { CurrentUser, JwtUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permissions.decorator';
 import { AdminService } from './admin.service';
 import {
   AuditQueryDto,
@@ -36,16 +37,19 @@ export class AdminController {
 
   // Venues
   @Get('venues')
+  @RequirePermission('venue.list')
   listVenues(@Query() q: ListVenuesDto) {
     return this.admin.listVenues(q);
   }
 
   @Post('venues/:id/approve')
+  @RequirePermission('venue.approve')
   approve(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.admin.approveVenue(user.sub, user.role, id);
   }
 
   @Post('venues/:id/reject')
+  @RequirePermission('venue.reject')
   reject(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -55,17 +59,20 @@ export class AdminController {
   }
 
   @Post('venues/:id/suspend')
+  @RequirePermission('venue.suspend')
   suspend(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.admin.suspendVenue(user.sub, user.role, id);
   }
 
   // Users
   @Get('users')
+  @RequirePermission('user.list')
   listUsers(@Query() q: ListUsersDto) {
     return this.admin.listUsers(q);
   }
 
   @Patch('users/:id')
+  @RequirePermission('user.suspend')
   updateUser(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -76,11 +83,13 @@ export class AdminController {
 
   // Disputes
   @Get('disputes')
+  @RequirePermission('dispute.resolve')
   disputes() {
     return this.admin.listDisputes();
   }
 
   @Post('disputes/:id/resolve')
+  @RequirePermission('dispute.resolve')
   resolve(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -91,12 +100,14 @@ export class AdminController {
 
   // Reports
   @Get('reports')
+  @RequirePermission('report.view')
   reports(@Query() q: ReportsAdminQueryDto) {
     return this.admin.reports(q);
   }
 
   // Audit
   @Get('audit')
+  @RequirePermission('audit.view')
   audit(@Query() q: AuditQueryDto) {
     return this.admin.listAudit(q);
   }

@@ -13,6 +13,13 @@ import type { UiUser } from '@/lib/api/adapters/user';
 const MOCK_USER_KEY = 'sb_mock_user';
 
 export async function logout(): Promise<void> {
+  // Clear cache permissions (lazy import để tránh circular)
+  try {
+    const mod = await import('@/lib/use-permissions');
+    mod.clearPermissionsCache();
+  } catch {
+    // ignore
+  }
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 150));
     clearMockUser();

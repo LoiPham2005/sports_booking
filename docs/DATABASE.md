@@ -260,6 +260,16 @@ Unique: (provider, externalEventId).
 - `RolePermission { role, permissionId, grantedBy?, createdAt }` — composite PK `(role, permissionId)`.
 - Seed 23 permission mặc định lần đầu khi gọi `GET /system/permissions`. SUPER_ADMIN tự động có toàn bộ; ADMIN có 18 quyền vận hành mặc định.
 - Guard `PermissionsGuard` + decorator `@RequirePermission('key')` để check runtime. SUPER_ADMIN bypass.
+- **Cache** `Map<Role, Set<string>>` trong `PermissionsService` — lazy load + invalidate khi `updateRolePermissions`. Không hit DB mỗi request.
+- **PermissionsGuard register global** trong `AppModule` cùng cấp `JwtAuthGuard`/`RolesGuard`. Mọi route có `@RequirePermission` đều enforce tự động không cần `@UseGuards` thủ công.
+- **`GET /me/permissions`** trả `{ role, keys }` cho user hiện tại — frontend hook `useHasPermission(key)` dùng để conditional render UI.
+- Áp dụng hiện tại: AdminController (8 endpoints), VouchersController (3 endpoints). Mở rộng tới Owner/Staff khi cần.
+- UI [/admin/system/permissions](../frontend/src/app/(admin)/admin/system/permissions/page.tsx) — 5 card overview + matrix với toggle switch + category collapse + floating save bar (lưu nhiều role 1 lần click).
+
+### Booking — note về date filter
+- **Báo cáo doanh thu** (`/admin/reports`): filter theo `Booking.createdAt` (lúc đặt + thanh toán), không phải `startsAt` (lúc chơi). Lý do: booking hôm nay cho ngày chơi tương lai phải tính vào dòng tiền của hôm nay.
+- **Availability matrix** (`GET /venues/:id/availability?date=YYYY-MM-DD`): filter theo `startsAt` (lúc chơi) trong khoảng `[day_start, day_end)`. Status từng cell: `available` / `held` (PENDING_PAYMENT) / `booked` (CONFIRMED/CHECKED_IN/COMPLETED) / `closed` (theo `CourtClosure` + `VenueHour`).
+- **My bookings list** (`/me/bookings`): order theo `createdAt desc`, các tab `Sắp tới / Hoàn thành / Đã huỷ` filter theo status + startsAt vs now.
 
 ## Quy ước index quan trọng
 

@@ -232,6 +232,8 @@ Chỉ SUPER_ADMIN xem được. Hiển thị badge "SUPER ADMIN" trong header.
 - `tooltip`
 - `skeleton`
 - `toast`/`sonner`
+- `date-picker` — `<DatePicker>` chọn 1 ngày + `<DateRangePicker>` chọn khoảng. Calendar tháng 7×6 grid, format VN `DD/MM/YYYY`. Range picker có sidebar preset (7/30/90 ngày qua) + click 2 lần để set from→to. Value format `YYYY-MM-DD`. Min/max optional. Đã thay native `<input type="date">` xấu ở `/admin/reports`.
+- `time-picker` — `<TimePicker24>` chọn giờ:phút 24h kiểu VN. Popover 2 cột scroll (giờ 00-23 + phút theo step), click ngoài tự đóng. Không phụ thuộc locale browser AM/PM.
 - `confirm` — confirm dialog dùng chung. Mount `<ConfirmProvider>` ở root (qua `<Providers>` trong [components/providers.tsx](../frontend/src/components/providers.tsx)). API: `const confirm = useConfirm(); const ok = await confirm({ title, description?, confirmText?, cancelText?, tone?, requireText? })`. 4 tone (default/destructive/warning/info) với icon + màu nút phù hợp. Hỗ trợ `requireText` — yêu cầu user gõ chuỗi xác nhận cho action không thể undo.
 - `pagination` — dùng chung cho mọi list/table. Props: `page`, `pageSize`, `total`, `onPageChange`, `onPageSizeChange`, optional `pageSizeOptions` (default `[10, 20, 50, 100]`), `siblingCount` (default 1), `showFirstLast` (default true), `disabled`. Hiển thị `X – Y / Z bản ghi`, dropdown chọn page size, các nút trang với ellipsis `...`. Đã áp dụng tại 8 trang admin/owner/staff (xem [STATUS.md](STATUS.md#test-accounts-seed)).
 
@@ -243,6 +245,19 @@ Chỉ SUPER_ADMIN xem được. Hiển thị badge "SUPER ADMIN" trong header.
 - `rating-stars.tsx`
 - `price-tag.tsx`
 
+### Hooks (`lib/use-*.ts`)
+- `use-current-user.ts` — `useCurrentUser()` trả về user hiện tại (`undefined` loading / `null` chưa login / `UiUser`). Listen `storage` + custom `auth-changed` event để sync cross-tab. Helper `notifyAuthChanged()` dispatch để các component refetch.
+- `use-permissions.ts` — `useMyPermissions()` trả `Set<string>` permission keys, `useHasPermission(key)` shortcut bool. Cache module-level (1 fetch / tab lifetime), mock-aware (khớp `MOCK_PERMISSIONS` map với seed backend), SUPER_ADMIN trả `Set(['*'])` match-all. `clearPermissionsCache()` auto khi logout.
+- `use-staff-role.ts` — đọc `?role=manager` URL khi mock, fetch `getMyMemberships()` khi API mode để check MANAGER vs STAFF.
+
+Pattern: conditional UI cho theo quyền:
+```tsx
+const canApprove = useHasPermission('venue.approve');
+{canApprove && <Button onClick={approve}>Duyệt</Button>}
+```
+
+Sidebar admin filter menu theo permission ([admin/layout.tsx](../frontend/src/app/(admin)/admin/layout.tsx)) — NAV items có `permission?: string`, render `visibleNav` (filter `useMyPermissions`). User bị thu hồi quyền → menu tự ẩn.
+
 ### Venues (`components/venues/`)
 - `venue-map.tsx` + `venue-map-inner.tsx` — list view dạng map cho `/venues` (OpenStreetMap qua react-leaflet, dynamic import `ssr:false`).
 - `map-picker.tsx` + `map-picker-inner.tsx` — picker để chọn lat/lng (click + drag pin + Geolocation API). Dùng trong form tạo/sửa venue.
@@ -250,6 +265,8 @@ Chỉ SUPER_ADMIN xem được. Hiển thị badge "SUPER ADMIN" trong header.
 - `hours-editor.tsx` — 7 dòng ngày trong tuần với time inputs + checkbox "Đóng cửa" + nút "Áp dụng giờ T2 cho cả tuần". Gọi `listHours`/`upsertHours` data layer.
 - `images-editor.tsx` — 3 section: **Ảnh** (max 10MB, JPG/PNG/WebP/GIF) + **Video** (max 50MB, MP4/MOV) + **Đã tải lên** (grid hiển thị tất cả). Mỗi section có staging area: chọn file → preview local → click "Tải lên (n)" mới gửi server. Hover thumb trong grid Đã tải lên: nút Sao (đặt primary) + Xoá (xoá file thật trên Supabase Storage qua `key` field).
 - `prices-editor.tsx` — chọn sân con từ dropdown → list `PriceRule` + Add/Edit/Delete qua dialog. Day picker 7 nút Cuộn → 7 (CN..T7), time range, giá/slot.
+- `price-timeline.tsx` — Heat-map **7 ngày × 24 giờ** trực quan. Block giá lerp màu (emerald = rẻ → red = đắt). Click ô trống → select range qua bottom bar (cùng ngày, kéo dài) → "Set giá cho khung này" mở dialog prefill day+time. Click block đã có → edit. Legend dải màu sticky.
+- `venue-location-map.tsx` — Single-marker map cho venue detail page tab Vị trí (Leaflet + pin emoji).
 
 ### Supabase Storage upload flow
 1. Frontend gọi `POST /uploads/sign` với `{ kind, contentType, sizeBytes }`.

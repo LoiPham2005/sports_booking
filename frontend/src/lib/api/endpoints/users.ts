@@ -24,6 +24,9 @@ export const usersApi = {
     return toUiUser(dto);
   },
 
+  /** Trả về list permission keys của role hiện tại. */
+  myPermissions: () => apiGet<{ role: string; keys: string[] }>('/me/permissions'),
+
   /** Cập nhật profile (fullName/avatar/dob/gender/locale). */
   updateMe: (body: UpdateMeInput) => apiPatch<UserDto>('/me', body),
 

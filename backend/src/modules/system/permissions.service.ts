@@ -19,7 +19,42 @@ export interface PermissionMatrix {
 export class PermissionsService {
   private readonly logger = new Logger(PermissionsService.name);
 
+  /**
+   * Cache `role → Set<permission_key>` để `hasPermission()` không hit DB mỗi request.
+   * Invalidate khi `updateRolePermissions` chạy.
+   */
+  private cache: Map<Role, Set<string>> | null = null;
+
   constructor(private prisma: PrismaService) {}
+
+  private async loadCache(): Promise<void> {
+    if (this.cache) return;
+    const rows = await this.prisma.rolePermission.findMany({
+      include: { permission: { select: { key: true } } },
+    });
+    const map = new Map<Role, Set<string>>();
+    for (const r of [Role.CUSTOMER, Role.OWNER, Role.STAFF, Role.ADMIN, Role.SUPER_ADMIN]) {
+      map.set(r, new Set());
+    }
+    for (const rp of rows) {
+      map.get(rp.role)?.add(rp.permission.key);
+    }
+    this.cache = map;
+  }
+
+  private invalidateCache(): void {
+    this.cache = null;
+  }
+
+  /** Lấy tất cả permission keys của 1 role (dùng cho `GET /me/permissions`). */
+  async listKeysForRole(role: Role): Promise<string[]> {
+    if (role === Role.SUPER_ADMIN) {
+      const all = await this.prisma.permission.findMany({ select: { key: true } });
+      return all.map((p) => p.key);
+    }
+    await this.loadCache();
+    return Array.from(this.cache!.get(role) ?? []);
+  }
 
   /**
    * Đảm bảo các permission mặc định tồn tại trong DB. Không xóa permission cũ.
@@ -133,6 +168,7 @@ export class PermissionsService {
         data: perms.map((p) => ({ role, permissionId: p.id, grantedBy: actorId })),
       }),
     ]);
+    this.invalidateCache();
 
     await this.prisma.auditLog.create({
       data: {
@@ -151,14 +187,11 @@ export class PermissionsService {
 
   /**
    * Helper cho guard/decorator: kiểm tra role có quyền không.
-   * SUPER_ADMIN luôn true.
+   * SUPER_ADMIN luôn true. Dùng cache để không hit DB mỗi request.
    */
   async hasPermission(role: Role, key: string): Promise<boolean> {
     if (role === Role.SUPER_ADMIN) return true;
-    const found = await this.prisma.rolePermission.findFirst({
-      where: { role, permission: { key } },
-      select: { role: true },
-    });
-    return !!found;
+    await this.loadCache();
+    return this.cache!.get(role)?.has(key) ?? false;
   }
 }

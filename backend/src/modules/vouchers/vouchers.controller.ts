@@ -11,6 +11,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permissions.decorator';
 import { VouchersService } from './vouchers.service';
 import {
   CreateVoucherDto,
@@ -31,16 +32,19 @@ export class VouchersController {
   }
 
   @Post()
+  @RequirePermission('voucher.create')
   create(@Body() dto: CreateVoucherDto) {
     return this.vouchers.create(dto);
   }
 
   @Patch(':id')
+  @RequirePermission('voucher.update')
   update(@Param('id') id: string, @Body() dto: UpdateVoucherDto) {
     return this.vouchers.update(id, dto);
   }
 
   @Delete(':id')
+  @RequirePermission('voucher.delete')
   remove(@Param('id') id: string) {
     return this.vouchers.remove(id);
   }

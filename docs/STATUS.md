@@ -73,11 +73,12 @@
 - `/admin/system/feature-flags` (per env toggle)
 
 ### ⏳ Chưa làm
-- Notifications page chi tiết (đã có /account/notifications nhưng thiếu group theo ngày)
+- **Admin broadcast notifications** — viết thông báo gửi all user / theo role / theo city. Schema `Notification` đã có; cần `POST /admin/notifications/broadcast` + UI form. (Owner cũng cần `/owner/notifications/send` để gửi cho khách của venue mình.)
 - Real-time booking calendar update (cần WebSocket)
 - Dark mode toggle UI (theme đã chuẩn bị trong globals.css)
 - i18n EN
 - Mobile responsive cho admin/owner portals (hiện ưu tiên desktop)
+- Multi-booking single-payment: hiện chọn N slot rời rạc → backend tạo N booking + N payment riêng. Cần endpoint merge thanh toán nếu muốn 1 transaction cho nhiều slot.
 
 ## Mobile (Flutter)
 
@@ -382,6 +383,31 @@ npx prisma migrate dev --name phase4_owner
 - A11y check
 
 ### ✅ Đã xong gần đây
+- **RBAC permission enforce end-to-end** — trước đây UI cho admin tick/untick nhưng backend không check (decorative). Đã hoàn thiện:
+  - **Backend cache**: `PermissionsService.hasPermission()` dùng `Map<Role, Set<string>>` in-memory, `loadCache()` lazy, `invalidateCache()` khi `updateRolePermissions` → O(1) không hit DB mỗi request.
+  - **Endpoint `GET /me/permissions`** ([users.controller.ts](../backend/src/modules/users/users.controller.ts)) — user query keys của role mình. SUPER_ADMIN tự động trả toàn bộ.
+  - **`PermissionsGuard` register global** trong [app.module.ts](../backend/src/app.module.ts) cùng cấp `JwtAuthGuard` + `RolesGuard` → mọi route có `@RequirePermission('key')` đều enforce tự động.
+  - **Áp `@RequirePermission` vào endpoints**: AdminController (8 routes: venue list/approve/reject/suspend, user list/suspend, dispute, report, audit), VouchersController (create/update/delete).
+  - **Frontend hook**: [`useMyPermissions()` + `useHasPermission(key)`](../frontend/src/lib/use-permissions.ts) — cache module-level (1 fetch/tab lifetime), mock-aware (khớp `MOCK_PERMISSIONS` map với seed backend), SUPER_ADMIN trả `Set(['*'])` match-all, `clearPermissionsCache()` auto khi logout.
+  - **Sidebar admin filter theo permission**: NAV items có `permission?: string` optional, render `visibleNav` (filter `useMyPermissions`). Khi user bị thu hồi quyền → menu tương ứng tự ẩn (vd ADMIN không có `voucher.create` → menu "Voucher" biến mất).
+- **Permissions page redesign** ([/admin/system/permissions](../frontend/src/app/(admin)/admin/system/permissions/page.tsx)) — bỏ matrix cũ 5 nút Lưu, thay bằng: 5 card overview với progress bar + toggle switches + category collapsible với nút bật/tắt cả group (tri-state ✓/~/○) + search bar + floating save bar (sticky bottom) lưu tất cả role dirty 1 click. SUPER_ADMIN locked icon rõ ràng.
+- **DatePicker / DateRangePicker dùng chung** — [components/ui/date-picker.tsx](../frontend/src/components/ui/date-picker.tsx). Lịch tháng 7×6 grid, format VN `DD/MM/YYYY`, RangePicker có preset 7/30/90 ngày qua + click 2 lần để set from→to, highlight range. Thay native `<input type="date">` xấu.
+- **Admin Reports wired API + UI** ([/admin/reports](../frontend/src/app/(admin)/admin/reports/page.tsx)) — backend rewrite raw SQL → Prisma client (typesafe, aggregate in-memory, dùng `createdAt` thay `startsAt`, group theo ngày VN UTC+7). Frontend fillMissingDays để chart 30 cột thay vì 1 cột. DateRangePicker filter dynamic.
+- **Venue Detail page full wire** ([/venues/[id]](../frontend/src/app/(public)/venues/[id]/page.tsx)) — gallery dùng `venue.images[]` thật (fallback 5 ảnh Unsplash khi rỗng, badge "Ảnh minh hoạ"), reviews thật từ `GET /venues/:id/reviews` với sort `recent/rating` + distribution chart, hours render 7 ngày từ `GET /venues/:id/hours`, location tab dùng Leaflet marker thật, Favorite button wired `POST/DELETE /me/favorites/:id` với optimistic update + yêu cầu login, Share button dùng `navigator.share()`.
+- **BookingMatrix wired availability API** — `GET /venues/:id/availability?date=YYYY-MM-DD` trả matrix `courts × slots` với price + status thật (available/booked/held/closed). Frontend tự fetch khi đổi ngày, cell hiện giá real từ PriceRule, support chọn slot rời rạc (non-consecutive). Mock mode gen pseudo-random deterministic status.
+- **Booking review trang `/booking/new`** — liệt kê từng slot user chọn với giá riêng, sum tổng chính xác (trước tính sai bằng cách lấy range first→last × giá). CTA "Tiếp tục thanh toán" / "Thanh toán" giờ nằm trong sidebar Tóm tắt (desktop) thay vì cuối content.
+- **Payment flow hoàn thiện**:
+  - **MoMo** đổi `requestType` từ `captureWallet` (chỉ QR) → `payWithMethod` (AIO: chọn ví/ATM/Visa)
+  - **Return handler** `/payments/return/momo` + `/payments/return/zalopay` giờ gọi `handleCallback()` để verify chữ ký + update `Payment.status=SUCCESS` + `Booking.status=CONFIRMED` + tạo `OwnerEarning` (trước chỉ redirect)
+  - **MoMo/VNPay credentials missing** → throw `ServiceUnavailableException` (HTTP 503) với message tiếng Việt rõ ràng thay vì 500 mơ hồ
+  - **ENV path fix**: `MOMO_RETURN_URL`, `VNPAY_RETURN_URL`, `ZALOPAY_REDIRECT_URL`, `GOOGLE_CALLBACK_URL` thêm prefix `/api/v1`
+  - **FE bỏ truyền `returnUrl`** trong POST `/payments` → để backend dùng env config trỏ về backend handler (đảm bảo verify + update DB trước khi FE thấy result)
+- **Auth-aware Header** ([components/shared/header.tsx](../frontend/src/components/shared/header.tsx)) — render khác nhau theo trạng thái login: chưa login hiện "Đăng nhập / Đăng ký", đã login hiện avatar + tên + nút LogOut + Heart + Bell. Hook `useCurrentUser()` ([lib/use-current-user.ts](../frontend/src/lib/use-current-user.ts)) listen `storage` event + custom `auth-changed` event để sync cross-tab + sau khi login/logout.
+- **Quick-login chips ở `/login` work cho cả mock + API mode** — mock: setMockUser → localStorage, API: gọi `POST /auth/login`. Có badge ở góc phải chỉ rõ "mock — chuyển trang" hoặc "gọi API thật".
+- **Cookie expired UX** — client.ts khi refresh fail → dispatch `auth-changed` → header tự update sang logged-out. Booking page catch 401 → toast "Phiên hết hạn" + redirect `/login?next=...` để sau login auto-back.
+- **Custom Time Picker 24h** ([components/ui/time-picker.tsx](../frontend/src/components/ui/time-picker.tsx)) — popover 2 cột scroll (giờ 00–23 + phút step tuỳ chọn), click cell active highlight + scroll vào view, không phụ thuộc locale browser AM/PM.
+- **Price Timeline visual** ([components/venues/price-timeline.tsx](../frontend/src/components/venues/price-timeline.tsx)) — 7 ngày × 24 giờ heat-map. Block giá lerp màu theo giá (xanh = rẻ, đỏ = đắt). Click ô trống → select range qua bottom bar → "Set giá cho khung này" mở dialog prefill day+time. Click block có sẵn → edit. Overlap check cả client + server (PG service).
+- **VND input formatting** — input giá tự format `400.000` dấu chấm + suffix `₫`, parse lại số nguyên khi gửi server.
 - **Upload ảnh + video tách section** — [images-editor.tsx](../frontend/src/components/venues/images-editor.tsx) refactor thành 3 khối: section "Ảnh" + section "Video" + grid "Đã tải lên". Mỗi section có staging area: chọn file → preview local (qua `URL.createObjectURL`) → click button **"Tải lên (n)"** mới gọi API. Validate type/size client-side trước khi gửi. Video render qua `<video controls>` cho phép play inline.
 - **Auto-create Supabase bucket** — `UploadsService.ensureBucket()` chạy 1 lần ở lần upload đầu: gọi `getBucket()` check trước, nếu chưa tồn tại thì `createBucket({ public: true, fileSizeLimit: 50MB })`. Yêu cầu `service_role` key (anon không có quyền tạo bucket).
 - **Xoá ảnh/video xoá luôn file trên Supabase** — Schema `VenueImage` thêm field `key String?` để track object path. Khi `deleteImage`: backend gọi `supabase.storage.remove([key])` trước, sau đó mới xoá DB row. Lỗi remove Supabase được catch để không kẹt nếu storage không reach được.

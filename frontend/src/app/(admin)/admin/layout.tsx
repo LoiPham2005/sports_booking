@@ -18,16 +18,26 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { LogoutButton } from '@/components/shared/logout-button';
+import { useMyPermissions } from '@/lib/use-permissions';
 import { cn } from '@/lib/utils';
 
-const NAV = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+  /** Nếu set, chỉ hiện khi user có permission key này */
+  permission?: string;
+}
+
+const NAV: NavItem[] = [
   { href: '/admin', label: 'Tổng quan', icon: LayoutDashboard, exact: true },
-  { href: '/admin/venues', label: 'Duyệt venue', icon: Building2 },
-  { href: '/admin/users', label: 'Người dùng', icon: Users },
-  { href: '/admin/disputes', label: 'Khiếu nại', icon: ShieldAlert },
-  { href: '/admin/vouchers', label: 'Voucher', icon: Tag },
-  { href: '/admin/reports', label: 'Báo cáo', icon: BarChart3 },
-  { href: '/admin/audit', label: 'Audit log', icon: ScrollText },
+  { href: '/admin/venues', label: 'Duyệt venue', icon: Building2, permission: 'venue.list' },
+  { href: '/admin/users', label: 'Người dùng', icon: Users, permission: 'user.list' },
+  { href: '/admin/disputes', label: 'Khiếu nại', icon: ShieldAlert, permission: 'dispute.resolve' },
+  { href: '/admin/vouchers', label: 'Voucher', icon: Tag, permission: 'voucher.create' },
+  { href: '/admin/reports', label: 'Báo cáo', icon: BarChart3, permission: 'report.view' },
+  { href: '/admin/audit', label: 'Audit log', icon: ScrollText, permission: 'audit.view' },
 ];
 
 const SUPER_NAV = [
@@ -39,6 +49,13 @@ const SUPER_NAV = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const permissions = useMyPermissions();
+  // Khi đang loading, hiển thị tất cả menu (sẽ ẩn dần khi permissions load xong)
+  const visibleNav = NAV.filter((item) => {
+    if (!item.permission) return true;
+    if (!permissions) return true; // loading
+    return permissions.has('*') || permissions.has(item.permission);
+  });
   return (
     <div className="flex min-h-screen bg-muted/30">
       <aside className="hidden w-64 shrink-0 border-r bg-card lg:flex lg:flex-col">
@@ -60,7 +77,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </Link>
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {NAV.map((item) => {
+          {visibleNav.map((item) => {
             const Icon = item.icon;
             const active = item.exact ? pathname === item.href : pathname?.startsWith(item.href);
             return (
