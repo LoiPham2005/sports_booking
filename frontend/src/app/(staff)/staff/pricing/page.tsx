@@ -10,6 +10,7 @@ import { Input, Label } from '@/components/ui/input';
 import { TimePicker24 } from '@/components/ui/time-picker';
 import { Crown, Plus, AlertTriangle, Trash2 } from 'lucide-react';
 import { useStaffRole } from '@/lib/use-staff-role';
+import { useConfirm } from '@/components/ui/confirm';
 import { formatVND } from '@/lib/format';
 import { listMyOverrides, createOverride, deleteOverride } from '@/lib/data/staff';
 import { getMyMemberships } from '@/lib/data/staff';
@@ -18,6 +19,7 @@ import type { PriceOverrideDto } from '@/lib/api/endpoints/staff';
 
 export default function StaffPricingPage() {
   const role = useStaffRole();
+  const confirm = useConfirm();
   const [showCreate, setShowCreate] = useState(false);
   const [venueId, setVenueId] = useState('');
   const [overrides, setOverrides] = useState<PriceOverrideDto[]>([]);
@@ -87,7 +89,16 @@ export default function StaffPricingPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Xoá override này?')) return;
+    const target = overrides.find((o) => o.id === id);
+    const ok = await confirm({
+      title: 'Xoá override giá?',
+      description: target
+        ? `Sân ${target.courtId} · ${new Date(target.date).toLocaleDateString('vi-VN')} · ${target.startTime}–${target.endTime}`
+        : undefined,
+      tone: 'destructive',
+      confirmText: 'Xoá',
+    });
+    if (!ok) return;
     setOverrides((prev) => prev.filter((o) => o.id !== id));
     try {
       await deleteOverride(id);

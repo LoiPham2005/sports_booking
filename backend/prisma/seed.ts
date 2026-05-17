@@ -387,6 +387,121 @@ async function main() {
     });
   }
 
+  // ─────────── Schedule bookings (hiện ở /staff/schedule + /staff dashboard) ───────────
+  // Tạo booking trải hôm nay + 2 ngày tới + 1 ngày trước cho demo venue
+  // Status đa dạng: CONFIRMED (sắp đến), CHECKED_IN (đang chơi), COMPLETED (đã xong),
+  // PENDING_PAYMENT (chờ thanh toán), CANCELLED_BY_USER (đã huỷ)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const scheduleSeeds = [
+    // Hôm qua — COMPLETED
+    { code: 'SCH00001', dayOffset: -1, startHour: 8, durationH: 1, status: BookingStatus.COMPLETED, price: 80_000, customerName: 'Nguyễn Văn An' },
+    { code: 'SCH00002', dayOffset: -1, startHour: 17, durationH: 2, status: BookingStatus.COMPLETED, price: 300_000, customerName: 'Trần Thị Bình' },
+    // Hôm nay — mix tất cả status
+    { code: 'SCH00003', dayOffset: 0, startHour: 7, durationH: 1, status: BookingStatus.COMPLETED, price: 80_000, customerName: 'Lê Văn Cường' },
+    { code: 'SCH00004', dayOffset: 0, startHour: 9, durationH: 1, status: BookingStatus.CHECKED_IN, price: 80_000, customerName: 'Phạm Thị Dung' },
+    { code: 'SCH00005', dayOffset: 0, startHour: 14, durationH: 2, status: BookingStatus.CONFIRMED, price: 160_000, customerName: 'Hoàng Văn Em' },
+    { code: 'SCH00006', dayOffset: 0, startHour: 18, durationH: 1, status: BookingStatus.CONFIRMED, price: 150_000, customerName: 'Đặng Thị Phương' },
+    { code: 'SCH00007', dayOffset: 0, startHour: 19, durationH: 2, status: BookingStatus.CONFIRMED, price: 300_000, customerName: 'Bùi Văn Giang' },
+    { code: 'SCH00008', dayOffset: 0, startHour: 21, durationH: 1, status: BookingStatus.PENDING_PAYMENT, price: 150_000, customerName: 'Vũ Thị Hà' },
+    // Ngày mai — CONFIRMED hoặc đã huỷ
+    { code: 'SCH00009', dayOffset: 1, startHour: 8, durationH: 1, status: BookingStatus.CONFIRMED, price: 80_000, customerName: 'Đỗ Văn Khoa' },
+    { code: 'SCH00010', dayOffset: 1, startHour: 17, durationH: 2, status: BookingStatus.CONFIRMED, price: 300_000, customerName: 'Ngô Thị Lan' },
+    { code: 'SCH00011', dayOffset: 1, startHour: 20, durationH: 1, status: BookingStatus.CANCELLED_BY_USER, price: 150_000, customerName: 'Mai Văn Minh' },
+    // 2 ngày tới — CONFIRMED
+    { code: 'SCH00012', dayOffset: 2, startHour: 10, durationH: 1, status: BookingStatus.CONFIRMED, price: 80_000, customerName: 'Lý Thị Nga' },
+    { code: 'SCH00013', dayOffset: 2, startHour: 18, durationH: 1, status: BookingStatus.CONFIRMED, price: 150_000, customerName: 'Phan Văn Oai' },
+  ];
+
+  for (const s of scheduleSeeds) {
+    const existing = await prisma.booking.findUnique({ where: { code: s.code } });
+    if (existing) continue;
+    const startsAt = new Date(today.getTime() + s.dayOffset * 24 * 3600_000);
+    startsAt.setHours(s.startHour, 0, 0, 0);
+    const endsAt = new Date(startsAt.getTime() + s.durationH * 3600_000);
+
+    const booking = await prisma.booking.create({
+      data: {
+        code: s.code,
+        userId: customer.id,
+        courtId: demoCourt.id,
+        venueId: venue.id,
+        startsAt,
+        endsAt,
+        status: s.status,
+        subtotal: s.price,
+        total: s.price,
+        notes: s.customerName, // để hiển thị tên khách (mock — customer thật cùng 1 user)
+        checkedInAt: s.status === BookingStatus.CHECKED_IN ? new Date(startsAt.getTime() + 5 * 60_000) : null,
+      },
+    });
+
+    // Tạo payment SUCCESS cho booking đã confirm/checkin/completed
+    const paidStatuses: BookingStatus[] = [
+      BookingStatus.CONFIRMED,
+      BookingStatus.CHECKED_IN,
+      BookingStatus.COMPLETED,
+    ];
+    if (paidStatuses.includes(s.status)) {
+      await prisma.payment.create({
+        data: {
+          bookingId: booking.id,
+          userId: customer.id,
+          provider: PaymentProvider.VNPAY,
+          amount: s.price,
+          status: PaymentStatus.SUCCESS,
+          providerOrderId: `${s.code}-PAY`,
+          paidAt: startsAt,
+        },
+      });
+    }
+  }
+
+  // ─────────── Price overrides (hiện ở /staff/pricing) ───────────
+  const priceOverrideSeeds = [
+    {
+      dayOffset: 2,
+      startTime: '17:00',
+      endTime: '22:00',
+      price: 250_000,
+      reason: 'Lễ — tăng giá cao điểm',
+    },
+    {
+      dayOffset: 5,
+      startTime: '06:00',
+      endTime: '12:00',
+      price: 50_000,
+      reason: 'Sự kiện giảm sốc buổi sáng',
+    },
+    {
+      dayOffset: 7,
+      startTime: '18:00',
+      endTime: '21:00',
+      price: 200_000,
+      reason: 'Cuối tuần',
+    },
+  ];
+
+  for (const p of priceOverrideSeeds) {
+    const date = new Date(today.getTime() + p.dayOffset * 24 * 3600_000);
+    // Idempotent: tìm trùng courtId + date + startTime trước khi tạo
+    const existing = await prisma.priceOverride.findFirst({
+      where: { courtId: demoCourt.id, date, startTime: p.startTime },
+    });
+    if (existing) continue;
+    await prisma.priceOverride.create({
+      data: {
+        courtId: demoCourt.id,
+        date,
+        startTime: p.startTime,
+        endTime: p.endTime,
+        price: p.price,
+        reason: p.reason,
+      },
+    });
+  }
+
   // eslint-disable-next-line no-console
   console.log(
     [
@@ -401,6 +516,8 @@ async function main() {
       '    customer@sportsbooking.local / customer@1234 (CUSTOMER)',
       `- ${1 + extraVenues.length} venues at HCM with lat/lng for map`,
       `- ${disputeSeeds.length} pending refund disputes (booking + payment + refund)`,
+      `- ${scheduleSeeds.length} schedule bookings (today ± 2 days) for /staff/schedule`,
+      `- ${priceOverrideSeeds.length} price overrides for /staff/pricing`,
     ].join('\n'),
   );
 }

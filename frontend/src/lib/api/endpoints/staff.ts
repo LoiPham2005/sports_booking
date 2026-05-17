@@ -56,6 +56,11 @@ export const staffApi = {
     return list.map(toUiBooking);
   },
 
+  bookingDetail: async (id: string): Promise<UiBooking> => {
+    const dto = await apiGet<BookingDto>(`/staff/bookings/${encodeURIComponent(id)}`);
+    return toUiBooking(dto);
+  },
+
   checkIn: (token: string) => apiPost<BookingDto>('/staff/check-in', { token }),
 
   // Manager-only

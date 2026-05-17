@@ -111,6 +111,24 @@ export class StaffService {
     });
   }
 
+  async bookingDetail(userId: string, bookingId: string) {
+    const venueIds = await this.venueIdsForUser(userId);
+    if (venueIds.length === 0) throw new ForbiddenException('Not a staff member');
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        court: { select: { id: true, name: true } },
+        venue: { select: { id: true, name: true, addressLine: true, city: true, district: true, phone: true } },
+        user: { select: { id: true, fullName: true, phone: true, email: true } },
+      },
+    });
+    if (!booking) throw new NotFoundException();
+    if (!venueIds.includes(booking.venueId)) {
+      throw new ForbiddenException('Booking not in your venue');
+    }
+    return booking;
+  }
+
   // ─────────────────── Check-in ───────────────────
 
   async checkIn(userId: string, dto: CheckInDto) {

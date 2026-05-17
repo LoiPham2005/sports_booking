@@ -45,6 +45,11 @@ export class StaffController {
     return this.staff.schedule(user.sub, q);
   }
 
+  @Get('bookings/:id')
+  bookingDetail(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.staff.bookingDetail(user.sub, id);
+  }
+
   @Post('check-in')
   checkIn(@CurrentUser() user: JwtUser, @Body() dto: CheckInDto) {
     return this.staff.checkIn(user.sub, dto);

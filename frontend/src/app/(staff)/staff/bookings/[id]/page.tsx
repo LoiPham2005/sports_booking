@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ArrowLeft, Calendar, MapPin, Phone, QrCode, StickyNote } from 'lucide-react';
 import { formatVND } from '@/lib/format';
-import { bookingsApi } from '@/lib/api/endpoints/bookings';
+import { staffApi } from '@/lib/api/endpoints/staff';
 import { checkInBooking } from '@/lib/data/staff';
 import { isApiError } from '@/lib/api/errors';
 import { USE_MOCK } from '@/lib/api/config';
@@ -55,8 +55,8 @@ export default function StaffBookingDetailPage({ params }: { params: { id: strin
       return;
     }
     let cancelled = false;
-    bookingsApi
-      .detail(params.id)
+    staffApi
+      .bookingDetail(params.id)
       .then((data) => !cancelled && setBooking(data))
       .catch(() => {})
       .finally(() => !cancelled && setLoading(false));
