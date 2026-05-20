@@ -5,6 +5,7 @@ import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
+import 'payout/data/models/payout_dto.dart';
 import 'payout/presentation/providers/owner_payout_notifier.dart';
 
 class OwnerPayoutPage extends ConsumerWidget {
@@ -117,50 +118,79 @@ class OwnerPayoutPage extends ConsumerWidget {
 
           const SizedBox(height: 24),
           const _Section('Lịch sử chuyển khoản'),
-          ...MockData.payoutHistory.map(
-            (p) => Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(14),
+          if (summary?.history.isEmpty ?? false)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Text(
+                  'Chưa có giao dịch nào',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                ),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    height: 36,
-                    width: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.check,
-                        color: AppColors.success, size: 18),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(formatDateLong(p.date),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 13)),
-                        const Text('Đã chuyển thành công',
-                            style: TextStyle(
-                                color: AppColors.success, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                  Text(formatVND(p.amount),
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14)),
-                ],
-              ),
+            )
+          else
+            ...(summary?.history ?? const <PayoutHistoryItem>[])
+                .map((p) => _PayoutHistoryTile(item: p)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PayoutHistoryTile extends StatelessWidget {
+  final PayoutHistoryItem item;
+  const _PayoutHistoryTile({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final paid = item.status == 'PAID';
+    final paidAt = item.paidAt != null
+        ? DateTime.tryParse(item.paidAt!)
+        : null;
+    final color = paid ? AppColors.success : AppColors.warning;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 36,
+            width: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(paid ? Icons.check : Icons.hourglass_top,
+                color: color, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  paidAt != null
+                      ? formatDateLong(paidAt)
+                      : '${item.periodFrom} → ${item.periodTo}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+                Text(
+                  paid ? 'Đã chuyển thành công' : item.status,
+                  style: TextStyle(color: color, fontSize: 11),
+                ),
+              ],
             ),
           ),
+          Text(formatVND(item.amount),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w800, fontSize: 14)),
         ],
       ),
     );

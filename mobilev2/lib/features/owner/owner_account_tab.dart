@@ -6,12 +6,28 @@ import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
 import '../auth/presentation/providers/auth_notifier.dart';
+import 'owner_core/presentation/providers/owner_venues_notifier.dart';
+import 'payout/presentation/providers/owner_payout_notifier.dart';
+import 'staff/presentation/providers/owner_staff_notifier.dart';
 
 class OwnerAccountTab extends ConsumerWidget {
   const OwnerAccountTab({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider);
+    final userName = user?.fullName ?? 'Owner';
+    final userEmail = user?.email ?? user?.phone ?? '';
+    final venues =
+        ref.watch(ownerVenuesProvider).value ?? MockData.ownerVenues;
+    final staff =
+        ref.watch(ownerStaffProvider).value;
+    final activeStaff = staff?.where((s) => s.inviteStatus == 'ACTIVE').length;
+    final totalStaff = staff?.length;
+    final payout = ref.watch(ownerPayoutProvider).value;
+    final avgRating = venues.isEmpty
+        ? 0.0
+        : venues.fold<double>(0, (s, v) => s + v.rating) / venues.length;
     return SafeArea(
       child: ListView(
         children: [
@@ -40,22 +56,22 @@ class OwnerAccountTab extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 14),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
                         children: [
-                          Text('Owner Demo',
-                              style: TextStyle(
+                          Text(userName,
+                              style: const TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.w800)),
-                          SizedBox(width: 6),
-                          _OwnerBadge(),
+                          const SizedBox(width: 6),
+                          const _OwnerBadge(),
                         ],
                       ),
-                      Text('owner@sportsbooking.local',
-                          style: TextStyle(
+                      Text(userEmail,
+                          style: const TextStyle(
                               color: AppColors.textSecondary, fontSize: 13)),
                     ],
                   ),
@@ -79,13 +95,23 @@ class OwnerAccountTab extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppColors.border),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Expanded(child: _Kpi(value: '2', label: 'Venue')),
-                  _VDivider(),
-                  Expanded(child: _Kpi(value: '6', label: 'Sân')),
-                  _VDivider(),
-                  Expanded(child: _Kpi(value: '4.7★', label: 'Rating')),
+                  Expanded(
+                      child:
+                          _Kpi(value: '${venues.length}', label: 'Venue')),
+                  const _VDivider(),
+                  Expanded(
+                      child: _Kpi(
+                          value: '${totalStaff ?? 0}',
+                          label: 'Nhân viên')),
+                  const _VDivider(),
+                  Expanded(
+                      child: _Kpi(
+                          value: avgRating > 0
+                              ? '${avgRating.toStringAsFixed(1)}★'
+                              : '—',
+                          label: 'Rating')),
                 ],
               ),
             ),
@@ -94,7 +120,7 @@ class OwnerAccountTab extends ConsumerWidget {
           const SizedBox(height: 20),
 
           _Section('Sân của tôi'),
-          ...MockData.ownerVenues.map((v) => _Tile(
+          ...venues.map((v) => _Tile(
                 icon: Icons.stadium_outlined,
                 color: AppColors.primary,
                 title: v.name,
@@ -155,15 +181,17 @@ class OwnerAccountTab extends ConsumerWidget {
             icon: Icons.account_balance,
             color: AppColors.info,
             title: 'Tài khoản nhận tiền',
-            subtitle: MockData.ownerBankAccount['bankName']!,
+            subtitle: payout?.bankAccount?.bankCode ??
+                MockData.ownerBankAccount['bankName']!,
             onTap: () => context.push(RoutePaths.ownerPayout),
           ),
           _Tile(
             icon: Icons.groups_outlined,
             color: AppColors.accent,
             title: 'Nhân viên',
-            subtitle:
-                '${MockData.ownerStaffList.where((s) => s.status == StaffStatus.active).length} đang trực · ${MockData.ownerStaffList.length} tổng',
+            subtitle: staff == null
+                ? 'Đang tải...'
+                : '${activeStaff ?? 0} đang trực · ${totalStaff ?? 0} tổng',
             onTap: () => context.push(RoutePaths.ownerStaff),
           ),
 

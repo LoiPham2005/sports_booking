@@ -2,18 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../shared/mock/demo_state.dart';
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
 import '../auth/presentation/providers/auth_notifier.dart';
+import '../staff_portal/presentation/providers/staff_portal_notifier.dart';
 
 class StaffAccountTab extends ConsumerWidget {
   const StaffAccountTab({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isManager = DemoState.instance.isManager;
+    final isManager = ref.watch(isManagerProvider);
+    final user = ref.watch(currentUserProvider);
+    final userName =
+        user?.fullName ?? (isManager ? 'Manager' : 'Staff');
+    final memberships = ref.watch(staffMembershipsProvider).value ?? const [];
+    final venue = memberships.isNotEmpty ? memberships.first.venue : null;
+    final venueName = venue?.name ?? MockData.staffVenue.name;
+    final todayCount = (ref.watch(staffTodayProvider).value ??
+            MockData.staffBookingsToday)
+        .length;
     return SafeArea(
       child: ListView(
         children: [
@@ -45,7 +54,7 @@ class StaffAccountTab extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  isManager ? 'Manager Demo' : 'Nguyễn Văn Staff',
+                  userName,
                   style:
                       const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                 ),
@@ -122,7 +131,7 @@ class StaffAccountTab extends ConsumerWidget {
                         const Text('Đang trực tại',
                             style: TextStyle(
                                 color: AppColors.textMuted, fontSize: 11)),
-                        Text(MockData.staffVenue.name,
+                        Text(venueName,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w800, fontSize: 14)),
                         Text(
@@ -152,7 +161,7 @@ class StaffAccountTab extends ConsumerWidget {
             icon: Icons.event_note_outlined,
             color: AppColors.info,
             title: 'Báo cáo ca trực',
-            subtitle: 'Hôm nay: ${MockData.staffBookingsToday.length} booking',
+            subtitle: 'Hôm nay: $todayCount booking',
             onTap: () => context.push(RoutePaths.staffShiftReport),
           ),
 

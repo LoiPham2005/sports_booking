@@ -7,8 +7,10 @@ import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/slot_grid.dart';
+import '../customer/venues/presentation/providers/venue_detail_notifier.dart';
 import 'owner_core/data/models/owner_dtos.dart';
 import 'owner_core/presentation/providers/owner_bookings_notifier.dart';
+import 'owner_core/presentation/providers/owner_venues_notifier.dart';
 
 class OwnerWalkInPage extends ConsumerStatefulWidget {
   const OwnerWalkInPage({super.key});
@@ -20,14 +22,17 @@ class OwnerWalkInPage extends ConsumerStatefulWidget {
 class _OwnerWalkInPageState extends ConsumerState<OwnerWalkInPage> {
   final _nameCtl = TextEditingController();
   final _phoneCtl = TextEditingController();
-  String _courtId = MockData.courts.first.id;
+  String? _courtId;
   DateTime _date = DateTime.now();
   List<String> _slots = [];
   String _payMethod = 'cash';
   bool _submitting = false;
 
-  Court get _court => MockData.courts.firstWhere((c) => c.id == _courtId);
-  int get _total => _slots.length * _court.pricePerHour;
+  /// Lookup court trong list courts ưu tiên từ venue detail, fallback MockData.
+  Court _findCourt(List<Court> courts) =>
+      courts.firstWhere((c) => c.id == _courtId,
+          orElse: () => courts.first);
+  int _totalFor(Court c) => _slots.length * c.pricePerHour;
 
   @override
   void dispose() {
@@ -36,8 +41,8 @@ class _OwnerWalkInPageState extends ConsumerState<OwnerWalkInPage> {
     super.dispose();
   }
 
-  Future<void> _create() async {
-    if (_slots.isEmpty) return;
+  Future<void> _create(int total) async {
+    if (_slots.isEmpty || _courtId == null) return;
     setState(() => _submitting = true);
     try {
       // Parse first/last slot 'HH:MM' → ISO DateTime trên _date.
@@ -48,10 +53,10 @@ class _OwnerWalkInPageState extends ConsumerState<OwnerWalkInPage> {
 
       await ref.read(ownerBookingsProvider.notifier).createWalkIn(
             CreateWalkInRequest(
-              courtId: _courtId,
+              courtId: _courtId!,
               startsAt: start.toIso8601String(),
               endsAt: end.toIso8601String(),
-              total: _total,
+              total: total,
               customerName: _nameCtl.text.trim().isEmpty
                   ? null
                   : _nameCtl.text.trim(),
@@ -69,6 +74,21 @@ class _OwnerWalkInPageState extends ConsumerState<OwnerWalkInPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Lấy courts từ venue đầu tiên của owner (fallback MockData).
+    final ownerVenues = ref.watch(ownerVenuesProvider).value;
+    final firstVenueId = ownerVenues?.isNotEmpty == true
+        ? ownerVenues!.first.id
+        : null;
+    final detailCourts = firstVenueId != null
+        ? ref.watch(venueDetailProvider(firstVenueId)).value?.courts
+        : null;
+    final courts = (detailCourts?.isNotEmpty == true)
+        ? detailCourts!
+        : MockData.courts;
+    _courtId ??= courts.first.id;
+    final court = _findCourt(courts);
+    final total = _totalFor(court);
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -93,7 +113,7 @@ class _OwnerWalkInPageState extends ConsumerState<OwnerWalkInPage> {
                   const Text('Tổng',
                       style: TextStyle(
                           fontSize: 11, color: AppColors.textMuted)),
-                  Text(formatVND(_total),
+                  Text(formatVND(total),
                       style: const TextStyle(
                           color: AppColors.primary,
                           fontSize: 20,
@@ -103,7 +123,9 @@ class _OwnerWalkInPageState extends ConsumerState<OwnerWalkInPage> {
               const SizedBox(width: 16),
               Expanded(
                 child: FilledButton(
-                  onPressed: (_slots.isEmpty || _submitting) ? null : _create,
+                  onPressed: (_slots.isEmpty || _submitting)
+                      ? null
+                      : () => _create(total),
                   child: _submitting
                       ? const SizedBox(
                           width: 20,
@@ -145,12 +167,12 @@ class _OwnerWalkInPageState extends ConsumerState<OwnerWalkInPage> {
           const SizedBox(height: 20),
           const _Section('Sân'),
           Row(
-            children: MockData.courts.map((c) {
+            children: courts.map((c) {
               final selected = c.id == _courtId;
               return Expanded(
                 child: Padding(
                   padding:
-                      EdgeInsets.only(right: c == MockData.courts.last ? 0 : 8),
+                      EdgeInsets.only(right: c == courts.last ? 0 : 8),
                   child: InkWell(
                     onTap: () => setState(() => _courtId = c.id),
                     borderRadius: BorderRadius.circular(12),

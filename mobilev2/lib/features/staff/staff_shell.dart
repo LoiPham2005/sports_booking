@@ -1,44 +1,23 @@
 import 'package:flutter/material.dart';
-import '../../shared/mock/demo_state.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../shared/theme/app_colors.dart';
+import '../staff_portal/presentation/providers/staff_portal_notifier.dart';
 import 'staff_account_tab.dart';
 import 'staff_revenue_tab.dart';
 import 'staff_schedule_tab.dart';
 import 'staff_today_tab.dart';
 
-class StaffShell extends StatefulWidget {
+class StaffShell extends ConsumerStatefulWidget {
   const StaffShell({super.key});
 
   @override
-  State<StaffShell> createState() => _StaffShellState();
+  ConsumerState<StaffShell> createState() => _StaffShellState();
 }
 
-class _StaffShellState extends State<StaffShell> {
+class _StaffShellState extends ConsumerState<StaffShell> {
   int _index = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    DemoState.instance.addListener(_onRoleChange);
-  }
-
-  @override
-  void dispose() {
-    DemoState.instance.removeListener(_onRoleChange);
-    super.dispose();
-  }
-
-  void _onRoleChange() {
-    if (mounted) {
-      setState(() {
-        // Clamp index nếu role chuyển từ manager → staff (4 → 3 tabs)
-        if (_index >= _tabsForRole().length) _index = 0;
-      });
-    }
-  }
-
-  List<Widget> _tabsForRole() {
-    final isManager = DemoState.instance.isManager;
+  List<Widget> _tabsForRole(bool isManager) {
     return [
       const StaffTodayTab(),
       const StaffScheduleTab(),
@@ -47,8 +26,7 @@ class _StaffShellState extends State<StaffShell> {
     ];
   }
 
-  List<NavigationDestination> _destinationsForRole() {
-    final isManager = DemoState.instance.isManager;
+  List<NavigationDestination> _destinationsForRole(bool isManager) {
     return [
       const NavigationDestination(
         icon: Icon(Icons.today_outlined),
@@ -76,7 +54,10 @@ class _StaffShellState extends State<StaffShell> {
 
   @override
   Widget build(BuildContext context) {
-    final tabs = _tabsForRole();
+    final isManager = ref.watch(isManagerProvider);
+    final tabs = _tabsForRole(isManager);
+    // Clamp index nếu role chuyển từ manager → staff (4 → 3 tabs).
+    if (_index >= tabs.length) _index = 0;
     return Scaffold(
       body: IndexedStack(index: _index, children: tabs),
       bottomNavigationBar: NavigationBar(
@@ -86,7 +67,7 @@ class _StaffShellState extends State<StaffShell> {
         indicatorColor: AppColors.primary.withValues(alpha: 0.15),
         backgroundColor: Colors.white,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: _destinationsForRole(),
+        destinations: _destinationsForRole(isManager),
       ),
     );
   }
