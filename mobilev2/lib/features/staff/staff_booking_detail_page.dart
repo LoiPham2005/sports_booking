@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
@@ -7,18 +8,21 @@ import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/status_badge.dart';
+import '../customer/bookings/presentation/providers/bookings_notifier.dart';
 
-class StaffBookingDetailPage extends StatelessWidget {
+class StaffBookingDetailPage extends ConsumerWidget {
   final String id;
   const StaffBookingDetailPage({super.key, required this.id});
 
   @override
-  Widget build(BuildContext context) {
-    final all = [...MockData.staffBookingsToday, ...MockData.bookings];
-    final b = all.firstWhere(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncBooking = ref.watch(bookingDetailProvider(id));
+    final fallback = ([...MockData.staffBookingsToday, ...MockData.bookings])
+        .firstWhere(
       (x) => x.id == id,
       orElse: () => MockData.staffBookingsToday.first,
     );
+    final b = asyncBooking.value ?? fallback;
 
     return Scaffold(
       appBar: AppBar(

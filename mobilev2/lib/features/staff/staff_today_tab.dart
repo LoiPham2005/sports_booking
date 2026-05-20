@@ -1,25 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../shared/mock/demo_state.dart';
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/status_badge.dart';
+import '../staff_portal/presentation/providers/staff_portal_notifier.dart';
 
-class StaffTodayTab extends StatelessWidget {
+class StaffTodayTab extends ConsumerWidget {
   const StaffTodayTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final isManager = DemoState.instance.isManager;
-    final bookings = MockData.staffBookingsToday;
-    final upcoming = bookings.where((b) => b.startsAt.isAfter(DateTime.now())).toList();
-    final past = bookings.where((b) => b.endsAt.isBefore(DateTime.now())).toList();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isManager = ref.watch(isManagerProvider);
+    final memberships = ref.watch(staffMembershipsProvider).value ?? const [];
+    final venueName = memberships.isNotEmpty
+        ? memberships.first.venue.name
+        : MockData.staffVenue.name;
+    final bookings = ref.watch(staffTodayProvider).value ??
+        MockData.staffBookingsToday;
+    final revenue =
+        isManager ? ref.watch(staffRevenueProvider()).value : null;
+
     final now = DateTime.now();
-    final active = bookings.where((b) =>
-        !b.startsAt.isAfter(now) && !b.endsAt.isBefore(now)).toList();
+    final upcoming = bookings.where((b) => b.startsAt.isAfter(now)).toList();
+    final past = bookings.where((b) => b.endsAt.isBefore(now)).toList();
+    final active = bookings
+        .where((b) => !b.startsAt.isAfter(now) && !b.endsAt.isBefore(now))
+        .toList();
 
     return SafeArea(
       child: ListView(
@@ -89,7 +99,7 @@ class StaffTodayTab extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      MockData.staffVenue.name,
+                      venueName,
                       style: const TextStyle(
                           color: AppColors.textSecondary, fontSize: 12),
                       maxLines: 1,
@@ -144,7 +154,7 @@ class StaffTodayTab extends StatelessWidget {
                                 style: TextStyle(
                                     color: Colors.white70, fontSize: 11)),
                             Text(
-                              formatVND(2400000),
+                              formatVND(revenue?.revenue ?? 0),
                               style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 22,

@@ -1,18 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../shared/mock/demo_state.dart';
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
+import '../auth/presentation/providers/auth_notifier.dart';
+import '../staff_portal/presentation/providers/staff_portal_notifier.dart';
 
-class StaffShiftReportPage extends StatelessWidget {
+class StaffShiftReportPage extends ConsumerWidget {
   const StaffShiftReportPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final isManager = DemoState.instance.isManager;
-    final bookings = MockData.staffBookingsToday;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isManager = ref.watch(isManagerProvider);
+    final memberships = ref.watch(staffMembershipsProvider).value ?? const [];
+    final venueName = memberships.isNotEmpty
+        ? memberships.first.venue.name
+        : MockData.staffVenue.name;
+    final user = ref.watch(currentUserProvider);
+    final userName =
+        user?.fullName ?? (isManager ? 'Manager' : 'Staff');
+    final bookings = ref.watch(staffTodayProvider).value ??
+        MockData.staffBookingsToday;
     final completed =
         bookings.where((b) => b.status == BookingStatus.completed).length;
     final upcoming = bookings
@@ -98,12 +108,12 @@ class StaffShiftReportPage extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Text(MockData.staffVenue.name,
+                Text(venueName,
                     style: const TextStyle(
                         fontWeight: FontWeight.w800, fontSize: 16)),
                 const SizedBox(height: 4),
                 Text(
-                  '${isManager ? "Manager Demo" : "Nguyễn Văn Staff"} · 08:00 → 22:00',
+                  '$userName · 08:00 → 22:00',
                   style: const TextStyle(
                       color: AppColors.textMuted, fontSize: 12),
                 ),
@@ -268,7 +278,7 @@ class StaffShiftReportPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTimelineItem(Booking b) {
+  static Widget _buildTimelineItem(Booking b) {
     final color = switch (b.status) {
       BookingStatus.completed => AppColors.success,
       BookingStatus.confirmed => AppColors.info,

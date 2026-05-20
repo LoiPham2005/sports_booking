@@ -1,39 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../shared/routing/safe_pop.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/qr_scanner_placeholder.dart';
+import '../staff_portal/presentation/providers/staff_portal_notifier.dart';
 
-class StaffQrScanPage extends StatefulWidget {
+class StaffQrScanPage extends ConsumerStatefulWidget {
   const StaffQrScanPage({super.key});
 
   @override
-  State<StaffQrScanPage> createState() => _StaffQrScanPageState();
+  ConsumerState<StaffQrScanPage> createState() => _StaffQrScanPageState();
 }
 
-class _StaffQrScanPageState extends State<StaffQrScanPage> {
-  bool _scanned = false;
+class _StaffQrScanPageState extends ConsumerState<StaffQrScanPage> {
+  bool _scanning = false;
 
   Future<void> _simulateScan() async {
-    if (_scanned) return;
-    setState(() => _scanned = true);
-    // Show success bottom sheet
-    if (!mounted) return;
-    final b = MockData.staffBookingsToday.firstWhere(
+    if (_scanning) return;
+    setState(() => _scanning = true);
+
+    // Demo: pick a confirmed booking + use its id as fake token.
+    final fallback = MockData.staffBookingsToday.firstWhere(
       (b) => b.status == BookingStatus.confirmed,
       orElse: () => MockData.staffBookingsToday.first,
     );
-    await showModalBottomSheet(
+    final list = ref.read(staffTodayProvider).value ??
+        MockData.staffBookingsToday;
+    final b = list.firstWhere(
+      (x) => x.status == BookingStatus.confirmed,
+      orElse: () => fallback,
+    );
+
+    // Trigger real check-in flow (mock mode no-ops the API).
+    await ref.read(staffTodayProvider.notifier).checkIn(b.id);
+
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) => _SuccessSheet(booking: b),
     );
-    if (mounted) setState(() => _scanned = false);
+    if (mounted) setState(() => _scanning = false);
   }
 
   @override

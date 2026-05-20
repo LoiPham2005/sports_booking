@@ -1,37 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/revenue_sparkline.dart';
+import '../staff_portal/presentation/providers/staff_portal_notifier.dart';
 
-class StaffRevenueTab extends StatelessWidget {
+class StaffRevenueTab extends ConsumerWidget {
   const StaffRevenueTab({super.key});
 
-  static const _hourly = [
-    ('06', 0),
-    ('07', 350000),
-    ('08', 700000),
-    ('09', 0),
-    ('10', 0),
-    ('11', 0),
-    ('12', 0),
-    ('13', 0),
-    ('14', 0),
-    ('15', 0),
-    ('16', 1000000),
-    ('17', 0),
-    ('18', 700000),
-    ('19', 1000000),
-    ('20', 700000),
-    ('21', 0),
+  static const _hourLabels = [
+    '06', '07', '08', '09', '10', '11', '12', '13',
+    '14', '15', '16', '17', '18', '19', '20', '21',
   ];
 
   @override
-  Widget build(BuildContext context) {
-    final total = _hourly.fold<int>(0, (s, e) => s + e.$2);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final revenue = ref.watch(staffRevenueProvider()).value;
+    final memberships = ref.watch(staffMembershipsProvider).value ?? const [];
+    final venueName = memberships.isNotEmpty
+        ? memberships.first.venue.name
+        : 'Sân bóng đá Phú Mỹ Hưng';
+
+    final total = revenue?.revenue ?? 0;
+    final bookings = revenue?.bookings ?? 0;
+    final totalSlots = revenue?.totalSlots ?? 0;
+    final occupancy =
+        totalSlots > 0 ? ((bookings / totalSlots) * 100).round() : 0;
+
+    // Map hour → total cho 16 cột (06..21).
+    final byHourMap = <int, int>{};
+    final byHourList = revenue?.byHour ?? const [];
+    for (final h in byHourList) {
+      byHourMap[h.hour] = h.total;
+    }
+    final hourly = List<int>.generate(16, (i) => byHourMap[6 + i] ?? 0);
+    final hourlyMax = hourly.isEmpty
+        ? 1
+        : hourly.reduce((a, b) => a > b ? a : b).clamp(1, 1 << 30);
+
+    // Court split với percent.
+    final courts = revenue?.byCourt ?? const [];
+    final courtsTotal = courts.fold<int>(0, (s, c) => s + c.total);
 
     return SafeArea(
       child: ListView(
@@ -70,9 +83,10 @@ class StaffRevenueTab extends StatelessWidget {
           const SizedBox(height: 8),
           Text('Doanh thu venue',
               style: Theme.of(context).textTheme.displaySmall),
-          const Text(
-            'Sân bóng đá Phú Mỹ Hưng',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          Text(
+            venueName,
+            style: const TextStyle(
+                color: AppColors.textSecondary, fontSize: 13),
           ),
 
           const SizedBox(height: 20),
@@ -140,8 +154,8 @@ class StaffRevenueTab extends StatelessWidget {
                 child: _Kpi(
                   icon: Icons.event_available,
                   label: 'Bookings',
-                  value: '6',
-                  trend: '+1',
+                  value: '$bookings',
+                  trend: '',
                 ),
               ),
               const SizedBox(width: 8),
@@ -149,17 +163,17 @@ class StaffRevenueTab extends StatelessWidget {
                 child: _Kpi(
                   icon: Icons.percent,
                   label: 'Lấp đầy',
-                  value: '78%',
-                  trend: '+5%',
+                  value: '$occupancy%',
+                  trend: '',
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _Kpi(
-                  icon: Icons.replay,
-                  label: 'Khách quen',
-                  value: '42%',
-                  trend: '+3%',
+                  icon: Icons.access_time,
+                  label: 'Slot trống',
+                  value: '${(totalSlots - bookings).clamp(0, 1 << 30)}',
+                  trend: '',
                 ),
               ),
             ],
@@ -186,10 +200,9 @@ class StaffRevenueTab extends StatelessWidget {
                   height: 120,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
-                    children: _hourly.map((e) {
-                      final v = e.$2;
-                      const max = 1000000;
-                      final pct = v / max;
+                    children: List.generate(16, (i) {
+                      final v = hourly[i];
+                      final pct = v / hourlyMax;
                       return Expanded(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -214,16 +227,16 @@ class StaffRevenueTab extends StatelessWidget {
                           ),
                         ),
                       );
-                    }).toList(),
+                    }),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Row(
-                  children: _hourly
-                      .map((e) => Expanded(
+                  children: _hourLabels
+                      .map((d) => Expanded(
                             child: Center(
                               child: Text(
-                                e.$1,
+                                d,
                                 style: const TextStyle(
                                     fontSize: 9,
                                     color: AppColors.textMuted),
@@ -291,42 +304,59 @@ class StaffRevenueTab extends StatelessWidget {
                     style:
                         TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                 const SizedBox(height: 12),
-                for (final c in const [
-                  ('Sân 1', 700000, 30),
-                  ('Sân 2', 700000, 30),
-                  ('Sân VIP', 1000000, 40),
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(c.$1,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600)),
-                            Text('${c.$3}% · ${formatVND(c.$2)}',
-                                style: const TextStyle(
-                                    color: AppColors.textMuted,
-                                    fontSize: 12)),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: LinearProgressIndicator(
-                            value: c.$3 / 100,
-                            minHeight: 6,
-                            backgroundColor: AppColors.surfaceAlt,
-                            valueColor: const AlwaysStoppedAnimation(
-                                Color(0xFF8B5CF6)),
-                          ),
-                        ),
-                      ],
+                if (courts.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Chưa có dữ liệu',
+                      style:
+                          TextStyle(color: AppColors.textMuted, fontSize: 12),
                     ),
-                  ),
+                  )
+                else
+                  for (final c in courts)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Builder(builder: (_) {
+                            final pct = courtsTotal > 0
+                                ? (c.total / courtsTotal * 100).round()
+                                : 0;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(c.courtName,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600)),
+                                    Text('$pct% · ${formatVND(c.total)}',
+                                        style: const TextStyle(
+                                            color: AppColors.textMuted,
+                                            fontSize: 12)),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: LinearProgressIndicator(
+                                    value: pct / 100,
+                                    minHeight: 6,
+                                    backgroundColor: AppColors.surfaceAlt,
+                                    valueColor: const AlwaysStoppedAnimation(
+                                        Color(0xFF8B5CF6)),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
               ],
             ),
           ),

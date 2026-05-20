@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../shared/mock/demo_state.dart';
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
+import '../auth/presentation/providers/auth_notifier.dart';
+import '../staff_portal/presentation/providers/staff_portal_notifier.dart';
 
-class StaffProfilePage extends StatefulWidget {
+class StaffProfilePage extends ConsumerStatefulWidget {
   const StaffProfilePage({super.key});
 
   @override
-  State<StaffProfilePage> createState() => _StaffProfilePageState();
+  ConsumerState<StaffProfilePage> createState() => _StaffProfilePageState();
 }
 
-class _StaffProfilePageState extends State<StaffProfilePage> {
+class _StaffProfilePageState extends ConsumerState<StaffProfilePage> {
   late final TextEditingController _name;
   late final TextEditingController _email;
   late final TextEditingController _phone;
@@ -23,15 +25,32 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
   @override
   void initState() {
     super.initState();
-    final isManager = DemoState.instance.isManager;
-    _name = TextEditingController(
-        text: isManager ? 'Manager Demo' : 'Nguyễn Văn Staff');
-    _email = TextEditingController(
-        text: isManager
-            ? 'manager@sportsbooking.local'
-            : 'staff@sportsbooking.local');
-    _phone = TextEditingController(text: '+84 901 234 567');
-    _dob = TextEditingController(text: '15/03/1995');
+    final user = ref.read(currentUserProvider);
+    _name = TextEditingController(text: user?.fullName ?? '');
+    _email = TextEditingController(text: user?.email ?? '');
+    _phone = TextEditingController(text: user?.phone ?? '');
+    // UserDto chưa expose dob/gender — UI editable, gửi qua updateProfile.
+    _dob = TextEditingController();
+  }
+
+  Future<void> _save() async {
+    final notifier = ref.read(authProvider.notifier);
+    String? isoDob;
+    final dobText = _dob.text.trim();
+    if (dobText.contains('/')) {
+      final parts = dobText.split('/');
+      if (parts.length == 3) {
+        isoDob =
+            '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}';
+      }
+    } else if (dobText.isNotEmpty) {
+      isoDob = dobText;
+    }
+    await notifier.updateProfile(
+      fullName: _name.text.trim(),
+      dob: isoDob,
+      gender: _gender.toUpperCase(),
+    );
   }
 
   @override
@@ -45,7 +64,11 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final isManager = DemoState.instance.isManager;
+    final isManager = ref.watch(isManagerProvider);
+    final memberships = ref.watch(staffMembershipsProvider).value ?? const [];
+    final venueName = memberships.isNotEmpty
+        ? memberships.first.venue.name
+        : MockData.staffVenue.name;
     final roleColor =
         isManager ? const Color(0xFF8B5CF6) : AppColors.accent;
 
@@ -58,12 +81,11 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
         title: const Text('Hồ sơ'),
         actions: [
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               if (_editing) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã lưu thay đổi')),
-                );
+                await _save();
               }
+              if (!mounted) return;
               setState(() => _editing = !_editing);
             },
             child: Text(_editing ? 'Lưu' : 'Sửa',
@@ -160,7 +182,7 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
             icon: Icons.stadium_outlined,
             color: AppColors.primary,
             label: 'Venue đang trực',
-            value: MockData.staffVenue.name,
+            value: venueName,
           ),
           _ReadOnlyTile(
             icon: Icons.badge_outlined,
