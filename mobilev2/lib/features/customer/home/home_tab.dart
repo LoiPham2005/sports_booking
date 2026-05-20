@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../shared/mock/mock_data.dart';
 import '../../../shared/routing/route_paths.dart';
@@ -8,12 +9,13 @@ import '../../../shared/utils/format.dart';
 import '../../../shared/widgets/sport_chip.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/widgets/venue_card.dart';
+import '../sports/presentation/providers/sports_notifier.dart';
 
-class HomeTab extends StatelessWidget {
+class HomeTab extends ConsumerWidget {
   const HomeTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final upcoming = MockData.bookings.firstWhere(
       (b) => b.status == BookingStatus.confirmed,
       orElse: () => MockData.bookings.first,
@@ -161,13 +163,28 @@ class HomeTab extends StatelessWidget {
           SliverToBoxAdapter(
             child: SizedBox(
               height: 110,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                scrollDirection: Axis.horizontal,
-                itemCount: MockData.sports.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
-                itemBuilder: (_, i) => SportChip(sport: MockData.sports[i]),
-              ),
+              child: ref.watch(sportsProvider).when(
+                    data: (sports) => ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: sports.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (_, i) => SportChip(sport: sports[i]),
+                    ),
+                    loading: () => const Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child:
+                            CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                    ),
+                    error: (e, _) => Center(
+                      child: Text('Lỗi: $e',
+                          style: const TextStyle(
+                              color: AppColors.danger, fontSize: 12)),
+                    ),
+                  ),
             ),
           ),
 
