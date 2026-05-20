@@ -1,28 +1,33 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../shared/mock/mock_data.dart';
 import '../../../shared/routing/route_paths.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/utils/format.dart';
 import '../../../shared/widgets/status_badge.dart';
+import 'presentation/providers/bookings_notifier.dart';
 
-class BookingsTab extends StatelessWidget {
+class BookingsTab extends ConsumerWidget {
   const BookingsTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final upcoming = MockData.bookings
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncBookings = ref.watch(myBookingsProvider);
+    final bookings = asyncBookings.value ?? const <Booking>[];
+
+    final upcoming = bookings
         .where((b) =>
             b.status == BookingStatus.confirmed ||
             b.status == BookingStatus.pendingPayment ||
             b.status == BookingStatus.checkedIn)
         .toList();
     final completed =
-        MockData.bookings.where((b) => b.status == BookingStatus.completed).toList();
+        bookings.where((b) => b.status == BookingStatus.completed).toList();
     final cancelled =
-        MockData.bookings.where((b) => b.status == BookingStatus.cancelled).toList();
+        bookings.where((b) => b.status == BookingStatus.cancelled).toList();
 
     return DefaultTabController(
       length: 3,

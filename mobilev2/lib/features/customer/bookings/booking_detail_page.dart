@@ -1,24 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/routing/safe_pop.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../shared/mock/mock_data.dart';
+import '../../../shared/routing/safe_pop.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/utils/format.dart';
 import '../../../shared/widgets/status_badge.dart';
+import 'presentation/providers/bookings_notifier.dart';
 
-class BookingDetailPage extends StatelessWidget {
+class BookingDetailPage extends ConsumerWidget {
   final String id;
   const BookingDetailPage({super.key, required this.id});
 
   @override
-  Widget build(BuildContext context) {
-    final b = MockData.bookings.firstWhere(
-      (x) => x.id == id,
-      orElse: () => MockData.bookings.first,
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncBooking = ref.watch(bookingDetailProvider(id));
 
+    return asyncBooking.when(
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(
+        appBar: AppBar(leading: BackButton(onPressed: () => safePop(context))),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('Lỗi: $e', style: const TextStyle(color: AppColors.danger)),
+          ),
+        ),
+      ),
+      data: (b) => _buildContent(context, ref, b),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, WidgetRef ref, Booking b) {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
