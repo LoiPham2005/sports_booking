@@ -1,29 +1,77 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../shared/mock/mock_data.dart';
 import '../../../shared/routing/route_paths.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/utils/format.dart';
 import '../../../shared/widgets/payment_method_tile.dart';
+import '../payments/presentation/providers/payments_notifier.dart';
 
-class BookingNewPage extends StatefulWidget {
+/// ⚠️ Page hiện tại dùng mock venue/court/slots hard-coded vì matrix chưa
+/// pass selection qua URL params (cần refactor `booking_matrix.dart` để
+/// truyền `courtId/startsAt/endsAt` qua state hoặc query string).
+///
+/// Phase 3 wired: nút "Thanh toán" cuối flow gọi `paymentFlowProvider.create()`
+/// thật, redirect tới `redirectUrl` (VNPay/MoMo) hoặc `/booking/result?paymentId=...`
+/// (ZaloPay) để poll status.
+///
+/// TODO: Refactor `booking_matrix` push với param + page nhận → quote() →
+/// hiển thị hold timer 10' → create booking → tạo payment → redirect.
+class BookingNewPage extends ConsumerStatefulWidget {
   const BookingNewPage({super.key});
 
   @override
-  State<BookingNewPage> createState() => _BookingNewPageState();
+  ConsumerState<BookingNewPage> createState() => _BookingNewPageState();
 }
 
-class _BookingNewPageState extends State<BookingNewPage> {
+class _BookingNewPageState extends ConsumerState<BookingNewPage> {
   int _step = 0; // 0: review, 1: payment
   PaymentMethod _method = PaymentMethod.vnpay;
+  bool _submitting = false;
 
   final venue = MockData.venues.first;
   final court = MockData.courts.first;
   final slots = ['18:00', '19:00'];
 
   int get _total => slots.length * court.pricePerHour;
+
+  /// Tạo Payment qua API rồi navigate sang result page poll status.
+  /// TODO: cần ghép với BookingFlowNotifier.createFromQuote() khi
+  /// matrix pass selection qua params.
+  Future<void> _submitPayment() async {
+    setState(() => _submitting = true);
+    try {
+      // TODO: thay 'mock-booking-id' bằng booking thật từ
+      // BookingFlowNotifier.createFromQuote() khi luồng matrix → page hoàn chỉnh.
+      const tempBookingId = 'b1';
+      final provider = _method.name.toUpperCase(); // VNPAY / MOMO / ZALOPAY
+
+      final payment = await ref
+          .read(paymentFlowProvider.notifier)
+          .create(bookingId: tempBookingId, provider: provider);
+
+      if (!mounted) return;
+      if (payment == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Khởi tạo thanh toán thất bại.')),
+        );
+        return;
+      }
+
+      // Nếu provider có redirectUrl → mở trình duyệt ngoài (VNPay/MoMo).
+      // Mobile chưa wire url_launcher — tạm navigate sang result để poll.
+      // Khi nào thêm url_launcher: `await launchUrl(Uri.parse(payment.redirectUrl!))`
+      context.go(
+        '${RoutePaths.bookingResult}?status=pending&method=${_method.name}&paymentId=${payment.id}',
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -257,14 +305,23 @@ class _BookingNewPageState extends State<BookingNewPage> {
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton(
-                onPressed: () {
-                  if (_step == 0) {
-                    setState(() => _step = 1);
-                  } else {
-                    context.go('${RoutePaths.bookingResult}?status=success&method=${_method.name}');
-                  }
-                },
-                child: Text(_step == 0 ? 'Tiếp tục' : 'Thanh toán'),
+                onPressed: _submitting
+                    ? null
+                    : () async {
+                        if (_step == 0) {
+                          setState(() => _step = 1);
+                          return;
+                        }
+                        await _submitPayment();
+                      },
+                child: _submitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(_step == 0 ? 'Tiếp tục' : 'Thanh toán'),
               ),
             ),
           ],

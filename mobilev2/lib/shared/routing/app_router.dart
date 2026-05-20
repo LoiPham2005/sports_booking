@@ -73,6 +73,7 @@ final appRouter = GoRouter(
       builder: (_, state) => BookingResultPage(
         status: state.uri.queryParameters['status'] ?? 'success',
         method: state.uri.queryParameters['method'] ?? 'vnpay',
+        paymentId: state.uri.queryParameters['paymentId'],
       ),
     ),
     GoRoute(

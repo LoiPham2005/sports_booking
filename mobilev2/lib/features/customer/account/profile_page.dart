@@ -1,14 +1,56 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+
 import '../../../shared/routing/safe_pop.dart';
-
 import '../../../shared/theme/app_colors.dart';
+import '../../auth/presentation/providers/auth_notifier.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends HookConsumerWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider).value;
+    final notifier = ref.read(authProvider.notifier);
+    final submitting = ref.watch(authProvider).isLoading;
+
+    final fullNameCtl = useTextEditingController(text: user?.fullName ?? '');
+    final phoneCtl = useTextEditingController(text: user?.phone ?? '');
+
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => safePop(context),
+          ),
+          title: const Text('Thông tin cá nhân'),
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('Bạn chưa đăng nhập.'),
+          ),
+        ),
+      );
+    }
+
+    Future<void> save() async {
+      await notifier.updateProfile(fullName: fullNameCtl.text.trim());
+      if (!context.mounted) return;
+      final st = ref.read(authProvider);
+      if (!st.hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã cập nhật.')),
+        );
+      }
+    }
+
+    final initial = user.fullName.isNotEmpty
+        ? user.fullName.characters.first.toUpperCase()
+        : '?';
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -16,7 +58,18 @@ class ProfilePage extends StatelessWidget {
           onPressed: () => safePop(context),
         ),
         title: const Text('Thông tin cá nhân'),
-        actions: [TextButton(onPressed: () {}, child: const Text('Lưu'))],
+        actions: [
+          TextButton(
+            onPressed: submitting ? null : save,
+            child: submitting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Lưu'),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
@@ -27,15 +80,15 @@ class ProfilePage extends StatelessWidget {
                 Container(
                   height: 100,
                   width: 100,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
+                    gradient: LinearGradient(
                       colors: [AppColors.primary, AppColors.primaryDark],
                     ),
                   ),
                   alignment: Alignment.center,
-                  child: const Text('M',
-                      style: TextStyle(
+                  child: Text(initial,
+                      style: const TextStyle(
                           color: Colors.white,
                           fontSize: 44,
                           fontWeight: FontWeight.w800)),
@@ -58,26 +111,29 @@ class ProfilePage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          _Section('Thông tin cơ bản'),
-          const _LabeledField(label: 'Họ và tên', value: 'Nguyễn Minh'),
+          const _Section('Thông tin cơ bản'),
+          _LabeledField(label: 'Họ và tên', controller: fullNameCtl),
           const SizedBox(height: 12),
-          const _LabeledField(label: 'Email', value: 'minh@example.com', readOnly: true),
+          _LabeledField(
+            label: 'Email',
+            controller: TextEditingController(text: user.email ?? ''),
+            readOnly: true,
+          ),
           const SizedBox(height: 12),
-          const _LabeledField(label: 'Số điện thoại', value: '+84 901 234 567'),
-          const SizedBox(height: 12),
-          const _LabeledField(label: 'Ngày sinh', value: '15/08/1995'),
-          const SizedBox(height: 12),
-          const _LabeledField(label: 'Giới tính', value: 'Nam'),
-
+          _LabeledField(
+            label: 'Số điện thoại',
+            controller: phoneCtl,
+            readOnly: true,
+          ),
           const SizedBox(height: 24),
-          _Section('Bảo mật'),
-          _SecurityRow(
+          const _Section('Bảo mật'),
+          const _SecurityRow(
             title: 'Mật khẩu',
-            subtitle: 'Cập nhật 2 tuần trước',
+            subtitle: 'Đổi mật khẩu để bảo vệ tài khoản',
             actionLabel: 'Đổi',
           ),
           const Divider(height: 24),
-          _SecurityRow(
+          const _SecurityRow(
             title: 'Xác thực 2 lớp',
             subtitle: 'Bảo vệ tài khoản qua OTP SMS',
             actionLabel: 'Bật',
@@ -91,7 +147,6 @@ class ProfilePage extends StatelessWidget {
 
 class _Section extends StatelessWidget {
   final String text;
-  // ignore: use_super_parameters
   const _Section(this.text);
   @override
   Widget build(BuildContext context) => Padding(
@@ -107,11 +162,11 @@ class _Section extends StatelessWidget {
 
 class _LabeledField extends StatelessWidget {
   final String label;
-  final String value;
+  final TextEditingController controller;
   final bool readOnly;
   const _LabeledField({
     required this.label,
-    required this.value,
+    required this.controller,
     this.readOnly = false,
   });
 
@@ -120,16 +175,18 @@ class _LabeledField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(label,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         TextField(
-          controller: TextEditingController(text: value),
+          controller: controller,
           readOnly: readOnly,
           decoration: InputDecoration(
             suffixIcon: readOnly
                 ? const Padding(
                     padding: EdgeInsets.only(right: 12),
-                    child: Icon(Icons.lock_outline, size: 16, color: AppColors.textMuted),
+                    child: Icon(Icons.lock_outline,
+                        size: 16, color: AppColors.textMuted),
                   )
                 : null,
           ),
