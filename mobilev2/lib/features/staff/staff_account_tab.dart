@@ -5,6 +5,7 @@ import '../../shared/mock/demo_state.dart';
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
+import '../../data/repos/auth_repo.dart';
 
 class StaffAccountTab extends StatelessWidget {
   const StaffAccountTab({super.key});
@@ -198,7 +199,7 @@ class StaffAccountTab extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             child: OutlinedButton.icon(
-              onPressed: () => context.go(RoutePaths.login),
+              onPressed: () async { await AuthRepo.logout(); if (context.mounted) context.go(RoutePaths.login); },
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.danger,
                 side: const BorderSide(color: AppColors.danger),

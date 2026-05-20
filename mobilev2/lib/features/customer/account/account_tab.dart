@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../shared/routing/route_paths.dart';
 import '../../../shared/theme/app_colors.dart';
+import '../../../data/repos/auth_repo.dart';
 
 class AccountTab extends StatelessWidget {
   const AccountTab({super.key});
@@ -162,7 +163,7 @@ class AccountTab extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
             child: OutlinedButton.icon(
-              onPressed: () => context.go(RoutePaths.login),
+              onPressed: () async { await AuthRepo.logout(); if (context.mounted) context.go(RoutePaths.login); },
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.danger,
                 side: const BorderSide(color: AppColors.danger),

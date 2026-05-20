@@ -52,27 +52,40 @@ class FlavorConfig {
   static bool get isProd => current.flavor == AppFlavor.prod;
 
   static void setFlavor(AppFlavor flavor) {
+    // Override qua `--dart-define=API_BASE=http://192.168.x.x:3000` khi cần
+    // (vd: test trên device thật cùng wifi). Default theo flavor.
+    const overrideApiBase = String.fromEnvironment('API_BASE');
+
     _instance = switch (flavor) {
-      AppFlavor.dev => const FlavorConfig._(
+      AppFlavor.dev => FlavorConfig._(
           flavor: AppFlavor.dev,
-          apiBaseUrl: 'https://api-dev.example.com',
-          appName: 'AppDev',
+          // Android emulator: 10.0.2.2 = host machine localhost.
+          // iOS simulator / macOS: dùng 127.0.0.1.
+          // Override: --dart-define=API_BASE=http://192.168.1.10:3000
+          apiBaseUrl: overrideApiBase.isNotEmpty
+              ? '$overrideApiBase/api/v1'
+              : 'http://10.0.2.2:3000/api/v1',
+          appName: 'Sports Booking Dev',
           enableLogging: true,
           enableCrashlytics: false,
           enableAnalytics: false,
         ),
-      AppFlavor.stg => const FlavorConfig._(
+      AppFlavor.stg => FlavorConfig._(
           flavor: AppFlavor.stg,
-          apiBaseUrl: 'https://api-stg.example.com',
-          appName: 'AppStg',
+          apiBaseUrl: overrideApiBase.isNotEmpty
+              ? '$overrideApiBase/api/v1'
+              : 'https://api-stg.sportsbooking.example.com/api/v1',
+          appName: 'Sports Booking Stg',
           enableLogging: true,
           enableCrashlytics: true,
           enableAnalytics: true,
         ),
-      AppFlavor.prod => const FlavorConfig._(
+      AppFlavor.prod => FlavorConfig._(
           flavor: AppFlavor.prod,
-          apiBaseUrl: 'https://api.example.com',
-          appName: 'App',
+          apiBaseUrl: overrideApiBase.isNotEmpty
+              ? '$overrideApiBase/api/v1'
+              : 'https://api.sportsbooking.example.com/api/v1',
+          appName: 'Sports Booking',
           enableLogging: false,
           enableCrashlytics: true,
           enableAnalytics: true,
