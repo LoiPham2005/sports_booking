@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:sports_booking_mobile/config/app/flavor_config.dart';
 import 'package:sports_booking_mobile/core/data/storage/secure_storage_service.dart';
 import 'package:sports_booking_mobile/core/services/utils/logger.dart';
-import 'package:sports_booking_mobile/data/config.dart';
+import 'package:sports_booking_mobile/core/common/constants/app_config.dart';
 
 /// JWT Bearer auth + auto-refresh interceptor.
 ///

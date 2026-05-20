@@ -1,13 +1,13 @@
 import 'package:sports_booking_mobile/core/base/di/injection.dart';
 import 'package:sports_booking_mobile/core/data/storage/secure_storage_service.dart';
-import 'package:sports_booking_mobile/data/api/auth_api.dart';
-import 'package:sports_booking_mobile/data/config.dart';
-import 'package:sports_booking_mobile/data/dto/auth_dto.dart';
-import 'package:sports_booking_mobile/data/dto/user_dto.dart';
+import 'package:sports_booking_mobile/features/auth/data/services/auth_service.dart';
+import 'package:sports_booking_mobile/core/common/constants/app_config.dart';
+import 'package:sports_booking_mobile/features/auth/data/models/auth_dto.dart';
+import 'package:sports_booking_mobile/features/auth/data/models/user_dto.dart';
 
 /// Auth repository — facade chọn mock vs API qua `AppConfig.useMock`.
 ///
-/// Khi API mode: gọi `AuthApi` qua DI + lưu token vào `SecureStorageService`.
+/// Khi API mode: gọi `AuthService` qua DI + lưu token vào `SecureStorageService`.
 /// Khi mock mode: trả `UserDto` giả theo identifier suffix:
 ///   - `admin@*` → ADMIN
 ///   - `owner@*` → OWNER
@@ -34,7 +34,7 @@ abstract class AuthRepo {
       return user;
     }
 
-    final api = getIt<AuthApi>();
+    final api = getIt<AuthService>();
     final result = await api.login(
       LoginRequest(identifier: identifier, password: password),
     );
@@ -60,7 +60,7 @@ abstract class AuthRepo {
       return user;
     }
 
-    final api = getIt<AuthApi>();
+    final api = getIt<AuthService>();
     final result = await api.register(
       RegisterRequest(
         fullName: fullName,
@@ -75,7 +75,7 @@ abstract class AuthRepo {
 
   static Future<void> forgotPassword(String identifier) async {
     if (AppConfig.useMock) return;
-    await getIt<AuthApi>()
+    await getIt<AuthService>()
         .forgotPassword(ForgotPasswordRequest(identifier: identifier));
   }
 
@@ -85,7 +85,7 @@ abstract class AuthRepo {
     required String newPassword,
   }) async {
     if (AppConfig.useMock) return;
-    await getIt<AuthApi>().resetPassword(
+    await getIt<AuthService>().resetPassword(
       ResetPasswordRequest(
         identifier: identifier,
         code: code,
@@ -103,7 +103,7 @@ abstract class AuthRepo {
     if (token == null || token.isEmpty) return null;
 
     try {
-      return await getIt<AuthApi>().me();
+      return await getIt<AuthService>().me();
     } catch (_) {
       return null;
     }
@@ -112,7 +112,7 @@ abstract class AuthRepo {
   static Future<void> logout() async {
     if (!AppConfig.useMock) {
       try {
-        await getIt<AuthApi>().logout();
+        await getIt<AuthService>().logout();
       } catch (_) {
         // Best-effort — token vẫn clear local kể cả call fail.
       }

@@ -1,23 +1,23 @@
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 import 'package:retrofit/retrofit.dart';
-import 'package:sports_booking_mobile/data/dto/auth_dto.dart';
-import 'package:sports_booking_mobile/data/dto/user_dto.dart';
+import 'package:sports_booking_mobile/features/auth/data/models/auth_dto.dart';
+import 'package:sports_booking_mobile/features/auth/data/models/user_dto.dart';
 
-part 'auth_api.g.dart';
+part 'auth_service.g.dart';
 
 /// Retrofit service mapping `/auth/*` + `/me`.
 ///
 /// Inject qua DI:
 /// ```dart
-/// final api = getIt<AuthApi>();
+/// final api = getIt<AuthService>();
 /// final result = await api.login(LoginRequest(identifier: '...', password: '...'));
 /// ```
 @RestApi()
 @LazySingleton()
-abstract class AuthApi {
+abstract class AuthService {
   @factoryMethod
-  factory AuthApi(Dio dio) = _AuthApi;
+  factory AuthService(Dio dio) = _AuthService;
 
   @POST('/auth/login')
   Future<AuthResultDto> login(@Body() LoginRequest body);

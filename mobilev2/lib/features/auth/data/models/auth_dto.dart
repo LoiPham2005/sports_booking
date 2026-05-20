@@ -1,5 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:sports_booking_mobile/data/dto/user_dto.dart';
+import 'package:sports_booking_mobile/features/auth/data/models/user_dto.dart';
 
 part 'auth_dto.freezed.dart';
 part 'auth_dto.g.dart';

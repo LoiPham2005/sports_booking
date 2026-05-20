@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../shared/routing/route_paths.dart';
 import '../../../shared/theme/app_colors.dart';
-import '../../../data/repos/auth_repo.dart';
+import '../../auth/data/repos/auth_repo.dart';
 
 class AccountTab extends StatelessWidget {
   const AccountTab({super.key});

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/config.dart';
-import '../../data/dto/user_dto.dart';
-import '../../data/repos/auth_repo.dart';
+import '../../core/common/constants/app_config.dart';
+import 'data/models/user_dto.dart';
+import 'data/repos/auth_repo.dart';
 import '../../shared/mock/demo_state.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';

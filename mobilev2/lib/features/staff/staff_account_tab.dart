@@ -5,7 +5,7 @@ import '../../shared/mock/demo_state.dart';
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
-import '../../data/repos/auth_repo.dart';
+import '../auth/data/repos/auth_repo.dart';
 
 class StaffAccountTab extends StatelessWidget {
   const StaffAccountTab({super.key});
