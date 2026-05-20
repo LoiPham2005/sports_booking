@@ -1,21 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
+import 'owner_core/presentation/providers/owner_bookings_notifier.dart';
 
-class OwnerCalendarTab extends StatefulWidget {
+class OwnerCalendarTab extends ConsumerStatefulWidget {
   const OwnerCalendarTab({super.key});
 
   @override
-  State<OwnerCalendarTab> createState() => _OwnerCalendarTabState();
+  ConsumerState<OwnerCalendarTab> createState() => _OwnerCalendarTabState();
 }
 
-class _OwnerCalendarTabState extends State<OwnerCalendarTab> {
+class _OwnerCalendarTabState extends ConsumerState<OwnerCalendarTab> {
   DateTime _weekStart = _mondayOf(DateTime.now());
   int _selectedDay = DateTime.now().weekday - 1; // 0..6
   String _courtFilter = 'all';
+
+  static const _hourStart = 6; // 06:00
+  static const _hours = [
+    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
+    '20:00', '21:00',
+  ];
 
   static DateTime _mondayOf(DateTime d) =>
       DateTime(d.year, d.month, d.day).subtract(Duration(days: d.weekday - 1));
@@ -23,28 +32,56 @@ class _OwnerCalendarTabState extends State<OwnerCalendarTab> {
   List<DateTime> get _week =>
       List.generate(7, (i) => _weekStart.add(Duration(days: i)));
 
-  static const _hours = [
-    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
-    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
-    '20:00', '21:00',
-  ];
+  String _yyyymmdd(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
-  /// (slot index 0-15, booking) — mock pattern based on day and hour.
-  bool _isBooked(int day, int hour) {
-    // Simulate busy weekends + evenings.
-    if (hour < 4) return false; // before 10am mostly free
-    if (day == 5 || day == 6) {
-      return hour >= 4 && hour <= 14; // weekend busy
-    }
-    return hour >= 11 && hour <= 14; // weekday evenings
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reloadDay());
   }
 
-  bool _isPending(int day, int hour) {
-    return day == _selectedDay && hour == 10;
+  void _reloadDay() {
+    final date = _yyyymmdd(_week[_selectedDay]);
+    ref.read(ownerBookingsProvider.notifier).apply(
+          OwnerBookingsFilter(date: date),
+        );
+  }
+
+  void _pickDay(int i) {
+    setState(() => _selectedDay = i);
+    _reloadDay();
+  }
+
+  void _pickWeek(DateTime newStart) {
+    setState(() => _weekStart = newStart);
+    _reloadDay();
+  }
+
+  /// Tìm booking phủ giờ `hour` (6..21) trong list — áp dụng courtFilter (name match).
+  Booking? _bookingAt(List<Booking> all, int hour) {
+    final day = _week[_selectedDay];
+    final slotStart = DateTime(day.year, day.month, day.day, hour);
+    final slotEnd = slotStart.add(const Duration(hours: 1));
+    for (final b in all) {
+      if (b.status == BookingStatus.cancelled) continue;
+      if (_courtFilter != 'all' &&
+          !b.courtName.toLowerCase().contains(_courtFilter.toLowerCase())) {
+        continue;
+      }
+      if (b.startsAt.isBefore(slotEnd) && b.endsAt.isAfter(slotStart)) {
+        return b;
+      }
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
+    final bookings =
+        ref.watch(ownerBookingsProvider).value ?? const <Booking>[];
     return SafeArea(
       child: Column(
         children: [
@@ -71,8 +108,8 @@ class _OwnerCalendarTabState extends State<OwnerCalendarTab> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.chevron_left),
-                  onPressed: () => setState(
-                      () => _weekStart = _weekStart.subtract(const Duration(days: 7))),
+                  onPressed: () => _pickWeek(
+                      _weekStart.subtract(const Duration(days: 7))),
                 ),
                 Expanded(
                   child: Center(
@@ -84,8 +121,8 @@ class _OwnerCalendarTabState extends State<OwnerCalendarTab> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.chevron_right),
-                  onPressed: () => setState(
-                      () => _weekStart = _weekStart.add(const Duration(days: 7))),
+                  onPressed: () =>
+                      _pickWeek(_weekStart.add(const Duration(days: 7))),
                 ),
               ],
             ),
@@ -104,7 +141,7 @@ class _OwnerCalendarTabState extends State<OwnerCalendarTab> {
                 final selected = i == _selectedDay;
                 const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
                 return InkWell(
-                  onTap: () => setState(() => _selectedDay = i),
+                  onTap: () => _pickDay(i),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     width: 52,
@@ -158,8 +195,9 @@ class _OwnerCalendarTabState extends State<OwnerCalendarTab> {
               itemCount: _hours.length,
               itemBuilder: (_, i) {
                 final hour = _hours[i];
-                final booked = _isBooked(_selectedDay, i);
-                final pending = _isPending(_selectedDay, i);
+                final b = _bookingAt(bookings, _hourStart + i);
+                final pending = b?.status == BookingStatus.pendingPayment;
+                final booked = b != null && !pending;
 
                 Color bg = AppColors.surfaceAlt;
                 Color border = AppColors.border;
@@ -171,23 +209,22 @@ class _OwnerCalendarTabState extends State<OwnerCalendarTab> {
                   bg = const Color(0xFFFEF3C7);
                   border = const Color(0xFFFCD34D);
                   fg = const Color(0xFFB45309);
-                  label = 'Chờ thanh toán · A. Phạm';
+                  label = 'Chờ TT · ${b!.code}';
                   icon = Icons.hourglass_top;
                 } else if (booked) {
                   bg = AppColors.primary.withValues(alpha: 0.1);
                   border = AppColors.primary.withValues(alpha: 0.4);
                   fg = AppColors.primary;
-                  final names = ['Trần Minh', 'Saigon FC', 'Lê Hà', 'Gia đình A'];
-                  label = names[i % names.length];
+                  label = '${b.courtName} · ${b.code}';
                   icon = Icons.check_circle;
                 }
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: InkWell(
-                    onTap: booked || pending
-                        ? () => context.push(
-                            RoutePaths.ownerBookingDetail('t3'))
+                    onTap: b != null
+                        ? () => context
+                            .push(RoutePaths.ownerBookingDetail(b.id))
                         : null,
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
@@ -220,8 +257,8 @@ class _OwnerCalendarTabState extends State<OwnerCalendarTab> {
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13)),
                           ),
-                          if (booked || pending)
-                            Text('${MockData.staffVenue.priceFrom ~/ 1000}k',
+                          if (b != null)
+                            Text('${b.total ~/ 1000}k',
                                 style: TextStyle(
                                     color: fg,
                                     fontWeight: FontWeight.w700,

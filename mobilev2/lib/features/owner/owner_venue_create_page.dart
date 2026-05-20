@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
+import 'owner_core/data/models/owner_dtos.dart';
+import 'owner_core/presentation/providers/owner_venues_notifier.dart';
 
-class OwnerVenueCreatePage extends StatefulWidget {
+class OwnerVenueCreatePage extends ConsumerStatefulWidget {
   const OwnerVenueCreatePage({super.key});
 
   @override
-  State<OwnerVenueCreatePage> createState() => _OwnerVenueCreatePageState();
+  ConsumerState<OwnerVenueCreatePage> createState() =>
+      _OwnerVenueCreatePageState();
 }
 
-class _OwnerVenueCreatePageState extends State<OwnerVenueCreatePage> {
+class _OwnerVenueCreatePageState extends ConsumerState<OwnerVenueCreatePage> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _description = TextEditingController();
@@ -36,7 +40,9 @@ class _OwnerVenueCreatePageState extends State<OwnerVenueCreatePage> {
     super.dispose();
   }
 
-  void _submit() {
+  bool _submitting = false;
+
+  Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
     if (_sports.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -44,6 +50,29 @@ class _OwnerVenueCreatePageState extends State<OwnerVenueCreatePage> {
       );
       return;
     }
+
+    setState(() => _submitting = true);
+    final notifier = ref.read(ownerVenuesProvider.notifier);
+    final body = CreateVenueRequest(
+      name: _name.text.trim(),
+      addressLine: _address.text.trim(),
+      city: _city,
+      district: _district.text.trim().isEmpty ? null : _district.text.trim(),
+      ward: _ward.text.trim().isEmpty ? null : _ward.text.trim(),
+      phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
+      description:
+          _description.text.trim().isEmpty ? null : _description.text.trim(),
+    );
+
+    final created = await notifier.create(body);
+    if (!mounted) return;
+    setState(() => _submitting = false);
+    if (created == null) return; // toast lỗi đã hiện qua useAsyncValueChange
+
+    // Submit DRAFT → PENDING (chờ admin duyệt).
+    await notifier.submit(created.id);
+    if (!mounted) return;
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -100,9 +129,16 @@ class _OwnerVenueCreatePageState extends State<OwnerVenueCreatePage> {
               Expanded(
                 flex: 2,
                 child: FilledButton.icon(
-                  onPressed: _submit,
-                  icon: const Icon(Icons.send_outlined, size: 18),
-                  label: const Text('Gửi duyệt'),
+                  onPressed: _submitting ? null : _submit,
+                  icon: _submitting
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.send_outlined, size: 18),
+                  label: Text(_submitting ? 'Đang gửi…' : 'Gửi duyệt'),
                 ),
               ),
             ],

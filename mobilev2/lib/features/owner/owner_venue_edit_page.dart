@@ -1,22 +1,26 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../shared/routing/safe_pop.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
+import '../customer/venues/presentation/providers/venue_detail_notifier.dart';
 
-class OwnerVenueEditPage extends StatelessWidget {
+class OwnerVenueEditPage extends ConsumerWidget {
   final String id;
   const OwnerVenueEditPage({super.key, required this.id});
 
   @override
-  Widget build(BuildContext context) {
-    final venue = MockData.venues.firstWhere(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncDetail = ref.watch(venueDetailProvider(id));
+    final fallback = MockData.venues.firstWhere(
       (v) => v.id == id,
       orElse: () => MockData.venues.first,
     );
+    final venue = asyncDetail.value?.venue ?? fallback;
 
     return DefaultTabController(
       length: 4,

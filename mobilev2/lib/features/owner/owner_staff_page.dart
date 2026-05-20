@@ -1,20 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
+import 'staff/data/models/staff_dto.dart';
+import 'staff/presentation/providers/owner_staff_notifier.dart';
 
-class OwnerStaffPage extends StatefulWidget {
+/// Adapter StaffMemberDto → OwnerStaff (UI model trong shared/mock).
+OwnerStaff _toOwnerStaff(StaffMemberDto dto) => OwnerStaff(
+      id: dto.id,
+      name: dto.user?.fullName ?? dto.email ?? '(chưa accept)',
+      email: dto.user?.email ?? dto.email ?? '',
+      phone: dto.user?.phone ?? '',
+      role: dto.role == 'MANAGER' ? StaffRole.manager : StaffRole.staff,
+      venueId: dto.venue.id,
+      venueName: dto.venue.name,
+      status: switch (dto.inviteStatus) {
+        'ACTIVE' => StaffStatus.active,
+        'PENDING' => StaffStatus.pending,
+        'SUSPENDED' => StaffStatus.suspended,
+        _ => StaffStatus.suspended,
+      },
+      joinedAt: DateTime.tryParse(dto.acceptedAt ?? dto.createdAt) ??
+          DateTime.now(),
+      bookingsHandled: 0,
+    );
+
+class OwnerStaffPage extends ConsumerStatefulWidget {
   const OwnerStaffPage({super.key});
 
   @override
-  State<OwnerStaffPage> createState() => _OwnerStaffPageState();
+  ConsumerState<OwnerStaffPage> createState() => _OwnerStaffPageState();
 }
 
-class _OwnerStaffPageState extends State<OwnerStaffPage> {
+class _OwnerStaffPageState extends ConsumerState<OwnerStaffPage> {
   String _filter = 'all'; // all | active | pending | suspended
   String _venueFilter = 'all';
   final _search = TextEditingController();
@@ -25,9 +48,16 @@ class _OwnerStaffPageState extends State<OwnerStaffPage> {
     super.dispose();
   }
 
+  /// All staff (adapted từ DTO của provider, fallback MockData khi loading).
+  List<OwnerStaff> get _allStaff {
+    final dtos = ref.watch(ownerStaffProvider).value;
+    if (dtos == null) return MockData.ownerStaffList;
+    return dtos.map(_toOwnerStaff).toList();
+  }
+
   List<OwnerStaff> get _items {
     final q = _search.text.trim().toLowerCase();
-    return MockData.ownerStaffList.where((s) {
+    return _allStaff.where((s) {
       if (_filter == 'active' && s.status != StaffStatus.active) return false;
       if (_filter == 'pending' && s.status != StaffStatus.pending) return false;
       if (_filter == 'suspended' && s.status != StaffStatus.suspended) {
@@ -45,7 +75,7 @@ class _OwnerStaffPageState extends State<OwnerStaffPage> {
   }
 
   int _countBy(StaffStatus s) =>
-      MockData.ownerStaffList.where((x) => x.status == s).length;
+      _allStaff.where((x) => x.status == s).length;
 
   @override
   Widget build(BuildContext context) {
@@ -380,9 +410,9 @@ class _OwnerStaffPageState extends State<OwnerStaffPage> {
             child: const Text('Huỷ'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              _snack('Đã xoá ${staff.name}');
+              await ref.read(ownerStaffProvider.notifier).remove(staff.id);
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             child: const Text('Xoá'),

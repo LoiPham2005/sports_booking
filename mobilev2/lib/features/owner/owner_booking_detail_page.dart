@@ -1,24 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../customer/bookings/presentation/providers/bookings_notifier.dart';
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/status_badge.dart';
+import 'owner_core/presentation/providers/owner_bookings_notifier.dart';
 
-class OwnerBookingDetailPage extends StatelessWidget {
+class OwnerBookingDetailPage extends ConsumerWidget {
   final String id;
   const OwnerBookingDetailPage({super.key, required this.id});
 
+  Future<void> _refuse(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Từ chối booking?'),
+        content: const Text(
+            'Booking sẽ bị huỷ và refund 100% cho khách. Hành động không thể hoàn tác.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Đóng'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Từ chối'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(ownerBookingsProvider.notifier).refuse(id);
+    if (context.mounted) safePop(context);
+  }
+
   @override
-  Widget build(BuildContext context) {
-    final all = [...MockData.bookingsToday, ...MockData.bookings];
-    final b = all.firstWhere(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncBooking = ref.watch(bookingDetailProvider(id));
+    final fallback = ([...MockData.bookingsToday, ...MockData.bookings])
+        .firstWhere(
       (x) => x.id == id,
       orElse: () => MockData.bookingsToday.first,
     );
+    final b = asyncBooking.value ?? fallback;
 
     return Scaffold(
       appBar: AppBar(
@@ -31,7 +61,11 @@ class OwnerBookingDetailPage extends StatelessWidget {
           IconButton(icon: const Icon(Icons.more_horiz), onPressed: () {}),
         ],
       ),
-      bottomNavigationBar: _ActionBar(status: b.status, onScan: () => context.push(RoutePaths.ownerQrScan)),
+      bottomNavigationBar: _ActionBar(
+        status: b.status,
+        onScan: () => context.push(RoutePaths.ownerQrScan),
+        onRefuse: () => _refuse(context, ref),
+      ),
       body: ListView(
         children: [
           // Header
@@ -201,7 +235,12 @@ class OwnerBookingDetailPage extends StatelessWidget {
 class _ActionBar extends StatelessWidget {
   final BookingStatus status;
   final VoidCallback onScan;
-  const _ActionBar({required this.status, required this.onScan});
+  final VoidCallback onRefuse;
+  const _ActionBar({
+    required this.status,
+    required this.onScan,
+    required this.onRefuse,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -211,12 +250,12 @@ class _ActionBar extends StatelessWidget {
         btns.addAll([
           Expanded(
             child: OutlinedButton(
-              onPressed: () {},
+              onPressed: onRefuse,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.danger,
                 side: const BorderSide(color: AppColors.danger),
               ),
-              child: const Text('Huỷ'),
+              child: const Text('Từ chối'),
             ),
           ),
           const SizedBox(width: 10),
