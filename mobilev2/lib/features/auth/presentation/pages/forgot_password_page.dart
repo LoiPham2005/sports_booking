@@ -1,103 +1,94 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import 'data/repos/auth_repo.dart';
-import '../../shared/routing/route_paths.dart';
-import '../../shared/theme/app_colors.dart';
+import '../../../../core/base/riverpod/riverpod_listeners.dart';
+import '../../../../shared/routing/route_paths.dart';
+import '../../../../shared/theme/app_colors.dart';
+import '../providers/auth_notifier.dart';
 
-class ForgotPasswordPage extends StatefulWidget {
+class ForgotPasswordPage extends HookConsumerWidget {
   const ForgotPasswordPage({super.key});
 
   @override
-  State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final identifierCtl = useTextEditingController();
+    final passwordCtl = useTextEditingController();
+    final otpCtls = useMemoized(
+      () => List<TextEditingController>.generate(6, (_) => TextEditingController()),
+    );
+    final otpFocus = useMemoized(
+      () => List<FocusNode>.generate(6, (_) => FocusNode()),
+    );
 
-class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
-  final _identifierCtl = TextEditingController();
-  final _otpCtls = List.generate(6, (_) => TextEditingController());
-  final _otpFocus = List.generate(6, (_) => FocusNode());
-  final _passwordCtl = TextEditingController();
+    // Dispose tự động.
+    useEffect(() {
+      return () {
+        for (final c in otpCtls) {
+          c.dispose();
+        }
+        for (final f in otpFocus) {
+          f.dispose();
+        }
+      };
+    }, const []);
 
-  int _step = 0; // 0 = nhập identifier, 1 = nhập OTP + password mới
-  bool _submitting = false;
-  String? _error;
+    final step = useState(0); // 0 = identifier, 1 = OTP + password
+    final localError = useState<String?>(null);
 
-  @override
-  void dispose() {
-    _identifierCtl.dispose();
-    for (final c in _otpCtls) {
-      c.dispose();
-    }
-    for (final f in _otpFocus) {
-      f.dispose();
-    }
-    _passwordCtl.dispose();
-    super.dispose();
-  }
+    final state = ref.watch(authProvider);
+    final notifier = ref.read(authProvider.notifier);
+    final submitting = state.isLoading;
 
-  String get _otpCode => _otpCtls.map((c) => c.text).join();
+    useAsyncValueChange(state);
 
-  Future<void> _requestOtp() async {
-    final id = _identifierCtl.text.trim();
-    if (id.isEmpty) {
-      setState(() => _error = 'Nhập email hoặc số điện thoại');
-      return;
-    }
+    String otpCode() => otpCtls.map((c) => c.text).join();
 
-    setState(() {
-      _submitting = true;
-      _error = null;
-    });
-
-    try {
-      await AuthRepo.forgotPassword(id);
-      if (!mounted) return;
-      setState(() => _step = 1);
-      _otpFocus.first.requestFocus();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = _friendlyError(e));
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  Future<void> _resetPassword() async {
-    if (_otpCode.length != 6) {
-      setState(() => _error = 'Nhập đủ 6 số OTP');
-      return;
-    }
-    if (_passwordCtl.text.length < 8) {
-      setState(() => _error = 'Mật khẩu tối thiểu 8 ký tự');
-      return;
+    Future<void> requestOtp() async {
+      final id = identifierCtl.text.trim();
+      if (id.isEmpty) {
+        localError.value = 'Nhập email hoặc số điện thoại';
+        return;
+      }
+      localError.value = null;
+      await notifier.forgotPassword(id);
+      if (!context.mounted) return;
+      if (!state.hasError) {
+        step.value = 1;
+        otpFocus.first.requestFocus();
+      }
     }
 
-    setState(() {
-      _submitting = true;
-      _error = null;
-    });
+    Future<void> resetPassword() async {
+      if (otpCode().length != 6) {
+        localError.value = 'Nhập đủ 6 số OTP';
+        return;
+      }
+      if (passwordCtl.text.length < 8) {
+        localError.value = 'Mật khẩu tối thiểu 8 ký tự';
+        return;
+      }
+      localError.value = null;
 
-    try {
-      await AuthRepo.resetPassword(
-        identifier: _identifierCtl.text.trim(),
-        code: _otpCode,
-        newPassword: _passwordCtl.text,
+      await notifier.resetPassword(
+        identifier: identifierCtl.text.trim(),
+        code: otpCode(),
+        newPassword: passwordCtl.text,
       );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mật khẩu đã đặt lại. Đăng nhập lại nhé.')),
-      );
-      context.go(RoutePaths.login);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = _friendlyError(e));
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
 
-  @override
-  Widget build(BuildContext context) {
+      if (!context.mounted) return;
+      if (!ref.read(authProvider).hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Mật khẩu đã đặt lại.')),
+        );
+        context.go(RoutePaths.login);
+      }
+    }
+
+    final apiError = state.hasError ? _friendlyError(state.error) : null;
+    final errorText = localError.value ?? apiError;
+
     return Scaffold(
       appBar: AppBar(),
       body: SafeArea(
@@ -106,80 +97,88 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Quên mật khẩu', style: Theme.of(context).textTheme.displaySmall),
+              Text('Quên mật khẩu',
+                  style: Theme.of(context).textTheme.displaySmall),
               const SizedBox(height: 8),
               Text(
-                _step == 0
+                step.value == 0
                     ? 'Nhập email/điện thoại — chúng tôi gửi mã OTP 6 số.'
                     : 'Nhập mã OTP đã gửi tới bạn và đặt mật khẩu mới.',
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.5),
+                style: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 14, height: 1.5),
               ),
               const SizedBox(height: 28),
-              if (_step == 0) ...[
+              if (step.value == 0) ...[
                 const Text('Email / Số điện thoại',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 TextField(
-                  controller: _identifierCtl,
+                  controller: identifierCtl,
                   keyboardType: TextInputType.emailAddress,
                   autocorrect: false,
                   decoration: const InputDecoration(hintText: 'ban@example.com'),
                 ),
-                if (_error != null) ...[
+                if (errorText != null) ...[
                   const SizedBox(height: 12),
-                  _ErrorBanner(message: _error!),
+                  _ErrorBanner(message: errorText),
                 ],
                 const SizedBox(height: 24),
                 FilledButton(
-                  onPressed: _submitting ? null : _requestOtp,
-                  child: _submitting
+                  onPressed: submitting ? null : requestOtp,
+                  child: submitting
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : const Text('Gửi mã OTP'),
                 ),
               ] else ...[
                 const Text('Mã OTP (6 số)',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: List.generate(6, (i) => _OtpBox(
-                        controller: _otpCtls[i],
-                        focus: _otpFocus[i],
-                        nextFocus: i < 5 ? _otpFocus[i + 1] : null,
+                        controller: otpCtls[i],
+                        focus: otpFocus[i],
+                        nextFocus: i < 5 ? otpFocus[i + 1] : null,
                       )),
                 ),
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: _submitting ? null : _requestOtp,
+                  onPressed: submitting ? null : requestOtp,
                   style: TextButton.styleFrom(padding: EdgeInsets.zero),
                   child: const Text('Gửi lại mã',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600)),
                 ),
                 const SizedBox(height: 16),
                 const Text('Mật khẩu mới',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 TextField(
-                  controller: _passwordCtl,
+                  controller: passwordCtl,
                   obscureText: true,
                   decoration: const InputDecoration(hintText: 'Ít nhất 8 ký tự'),
                 ),
-                if (_error != null) ...[
+                if (errorText != null) ...[
                   const SizedBox(height: 12),
-                  _ErrorBanner(message: _error!),
+                  _ErrorBanner(message: errorText),
                 ],
                 const SizedBox(height: 24),
                 FilledButton(
-                  onPressed: _submitting ? null : _resetPassword,
-                  child: _submitting
+                  onPressed: submitting ? null : resetPassword,
+                  child: submitting
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : const Text('Đặt lại mật khẩu'),
                 ),
@@ -189,16 +188,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         ),
       ),
     );
-  }
-
-  String _friendlyError(Object e) {
-    final msg = e.toString();
-    if (msg.contains('SocketException') || msg.contains('Connection refused')) {
-      return 'Không kết nối được server.';
-    }
-    if (msg.contains('404')) return 'Tài khoản không tồn tại.';
-    if (msg.contains('400')) return 'Mã OTP không hợp lệ hoặc hết hạn.';
-    return 'Có lỗi xảy ra. Vui lòng thử lại.';
   }
 }
 
@@ -263,4 +252,14 @@ class _ErrorBanner extends StatelessWidget {
           style: const TextStyle(color: AppColors.danger, fontSize: 13)),
     );
   }
+}
+
+String _friendlyError(Object? e) {
+  final msg = e?.toString() ?? '';
+  if (msg.contains('SocketException') || msg.contains('Connection refused')) {
+    return 'Không kết nối được server.';
+  }
+  if (msg.contains('404')) return 'Tài khoản không tồn tại.';
+  if (msg.contains('400')) return 'Mã OTP không hợp lệ hoặc hết hạn.';
+  return 'Có lỗi xảy ra. Vui lòng thử lại.';
 }

@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
-import '../auth/data/repos/auth_repo.dart';
+import '../auth/presentation/providers/auth_notifier.dart';
 
-class OwnerAccountTab extends StatelessWidget {
+class OwnerAccountTab extends ConsumerWidget {
   const OwnerAccountTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SafeArea(
       child: ListView(
         children: [
@@ -185,7 +186,7 @@ class OwnerAccountTab extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             child: OutlinedButton.icon(
-              onPressed: () async { await AuthRepo.logout(); if (context.mounted) context.go(RoutePaths.login); },
+              onPressed: () async { await ref.read(authProvider.notifier).logout(); if (context.mounted) context.go(RoutePaths.login); },
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.danger,
                 side: const BorderSide(color: AppColors.danger),

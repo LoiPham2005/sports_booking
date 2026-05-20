@@ -1,79 +1,75 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../core/common/constants/app_config.dart';
-import 'data/models/user_dto.dart';
-import 'data/repos/auth_repo.dart';
-import '../../shared/mock/demo_state.dart';
-import '../../shared/routing/route_paths.dart';
-import '../../shared/theme/app_colors.dart';
+import '../../../../core/base/riverpod/riverpod_listeners.dart';
+import '../../../../core/common/constants/app_config.dart';
+import '../../../../shared/mock/demo_state.dart';
+import '../../../../shared/routing/route_paths.dart';
+import '../../../../shared/theme/app_colors.dart';
+import '../../data/models/user_dto.dart';
+import '../providers/auth_notifier.dart';
 
-class LoginPage extends StatefulWidget {
+/// Login form — pattern theo `lib/features/_reference/voucher/`:
+/// - HookConsumerWidget + `useTextEditingController`
+/// - ref.watch(authProvider) cho submission state
+/// - useAsyncValueChange(state) cho toast error/success
+/// - ref.listen để navigate sau login OK
+class LoginPage extends HookConsumerWidget {
   const LoginPage({super.key});
 
-  @override
-  State<LoginPage> createState() => _LoginPageState();
-}
-
-class _LoginPageState extends State<LoginPage> {
-  final _identifierCtl = TextEditingController();
-  final _passwordCtl = TextEditingController();
-  bool _obscure = true;
-  bool _remember = true;
-  bool _submitting = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _identifierCtl.dispose();
-    _passwordCtl.dispose();
-    super.dispose();
-  }
-
-  /// Route đích theo role sau login.
-  String _redirectFor(UserRole role) => switch (role) {
+  /// Route đích theo role sau khi login thành công.
+  static String redirectFor(UserRole role) => switch (role) {
         UserRole.customer => RoutePaths.main,
         UserRole.owner => RoutePaths.owner,
         UserRole.staff => RoutePaths.staff,
-        UserRole.admin => RoutePaths.main, // TODO: thêm /admin khi có
+        // TODO: thêm /admin khi có route
+        UserRole.admin => RoutePaths.main,
         UserRole.superAdmin => RoutePaths.main,
       };
 
-  Future<void> _submit({String? identifier, String? password}) async {
-    final id = identifier ?? _identifierCtl.text.trim();
-    final pw = password ?? _passwordCtl.text;
-    if (id.isEmpty || pw.isEmpty) {
-      setState(() => _error = 'Vui lòng nhập đầy đủ thông tin');
-      return;
-    }
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final identifierCtl = useTextEditingController();
+    final passwordCtl = useTextEditingController();
+    final obscure = useState(true);
+    final remember = useState(true);
+    final localError = useState<String?>(null);
 
-    setState(() {
-      _submitting = true;
-      _error = null;
+    final state = ref.watch(authProvider);
+    final notifier = ref.read(authProvider.notifier);
+    final submitting = state.isLoading;
+
+    useAsyncValueChange(state);
+
+    // Navigate khi state đổi sang AsyncData(user) sau login thành công.
+    ref.listen<AsyncValue<UserDto?>>(authProvider, (prev, next) {
+      if (next is AsyncData<UserDto?> && next.value != null) {
+        context.go(redirectFor(next.value!.role));
+      }
     });
 
-    try {
-      final user = await AuthRepo.login(identifier: id, password: pw);
-      if (!mounted) return;
-      context.go(_redirectFor(user.role));
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = _friendlyError(e));
-    } finally {
-      if (mounted) setState(() => _submitting = false);
+    Future<void> submit({String? id, String? pw}) async {
+      final identifier = id ?? identifierCtl.text.trim();
+      final password = pw ?? passwordCtl.text;
+      if (identifier.isEmpty || password.isEmpty) {
+        localError.value = 'Vui lòng nhập đầy đủ thông tin';
+        return;
+      }
+      localError.value = null;
+      await notifier.login(identifier: identifier, password: password);
     }
-  }
 
-  /// Quick demo login — bypass form, chỉ chạy khi mock.
-  Future<void> _demoLogin(String identifier, {StaffPortalRole? staffRole}) async {
-    final user = await AuthRepo.login(identifier: identifier, password: 'demo');
-    if (staffRole != null) DemoState.instance.setStaffRole(staffRole);
-    if (!mounted) return;
-    context.go(_redirectFor(user.role));
-  }
+    Future<void> demoLogin(String identifier,
+        {StaffPortalRole? staffRole}) async {
+      if (staffRole != null) DemoState.instance.setStaffRole(staffRole);
+      await notifier.login(identifier: identifier, password: 'demo');
+    }
 
-  @override
-  Widget build(BuildContext context) {
+    final apiError = state.hasError ? _friendlyError(state.error) : null;
+    final errorText = localError.value ?? apiError;
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -97,13 +93,14 @@ class _LoginPageState extends State<LoginPage> {
                 child: const Text('🏟️', style: TextStyle(fontSize: 26)),
               ),
               const SizedBox(height: 32),
-              Text('Đăng nhập', style: Theme.of(context).textTheme.displaySmall),
+              Text('Đăng nhập',
+                  style: Theme.of(context).textTheme.displaySmall),
               const SizedBox(height: 8),
               const Text(
                 'Chào mừng trở lại! Đăng nhập để đặt sân và quản lý booking.',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.5),
+                style: TextStyle(
+                    color: AppColors.textSecondary, fontSize: 14, height: 1.5),
               ),
-
               const SizedBox(height: 28),
               OutlinedButton.icon(
                 onPressed: () {},
@@ -115,15 +112,16 @@ class _LoginPageState extends State<LoginPage> {
                 Expanded(child: Divider()),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('hoặc', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  child: Text('hoặc',
+                      style:
+                          TextStyle(color: AppColors.textMuted, fontSize: 12)),
                 ),
                 Expanded(child: Divider()),
               ]),
               const SizedBox(height: 20),
-
               const _FieldLabel('Email hoặc số điện thoại'),
               TextField(
-                controller: _identifierCtl,
+                controller: identifierCtl,
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
                 decoration: const InputDecoration(
@@ -131,11 +129,12 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 16),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Mật khẩu', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const Text('Mật khẩu',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13)),
                   TextButton(
                     onPressed: () => context.push(RoutePaths.forgotPassword),
                     child: const Text('Quên mật khẩu?'),
@@ -143,65 +142,54 @@ class _LoginPageState extends State<LoginPage> {
                 ],
               ),
               TextField(
-                controller: _passwordCtl,
-                obscureText: _obscure,
-                onSubmitted: (_) => _submit(),
+                controller: passwordCtl,
+                obscureText: obscure.value,
+                onSubmitted: (_) => submit(),
                 decoration: InputDecoration(
                   hintText: '••••••••',
                   suffixIcon: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                    onPressed: () => setState(() => _obscure = !_obscure),
+                    icon: Icon(obscure.value
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined),
+                    onPressed: () => obscure.value = !obscure.value,
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-
               Row(
                 children: [
                   Checkbox(
-                    value: _remember,
+                    value: remember.value,
                     activeColor: AppColors.primary,
-                    onChanged: (v) => setState(() => _remember = v ?? false),
+                    onChanged: (v) => remember.value = v ?? false,
                   ),
-                  const Text('Ghi nhớ đăng nhập', style: TextStyle(fontSize: 13)),
+                  const Text('Ghi nhớ đăng nhập',
+                      style: TextStyle(fontSize: 13)),
                 ],
               ),
-
-              if (_error != null) ...[
+              if (errorText != null) ...[
                 const SizedBox(height: 4),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.danger.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(color: AppColors.danger, fontSize: 13),
-                  ),
-                ),
+                _ErrorBanner(message: errorText),
               ],
               const SizedBox(height: 16),
-
               FilledButton(
-                onPressed: _submitting ? null : () => _submit(),
-                child: _submitting
+                onPressed: submitting ? null : submit,
+                child: submitting
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
                       )
                     : const Text('Đăng nhập'),
               ),
               const SizedBox(height: 24),
-
               Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Chưa có tài khoản? ', style: TextStyle(color: AppColors.textSecondary)),
+                    const Text('Chưa có tài khoản? ',
+                        style: TextStyle(color: AppColors.textSecondary)),
                     TextButton(
                       onPressed: () => context.push(RoutePaths.register),
                       child: const Text('Đăng ký ngay'),
@@ -209,27 +197,15 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
               ),
-
-              // Demo chips chỉ hiện ở mock mode (giống web frontend).
               if (AppConfig.useMock) ...[
                 const SizedBox(height: 32),
-                _DemoCard(onDemoLogin: _demoLogin),
+                _DemoCard(onDemoLogin: demoLogin),
               ],
             ],
           ),
         ),
       ),
     );
-  }
-
-  String _friendlyError(Object e) {
-    final msg = e.toString();
-    if (msg.contains('SocketException') || msg.contains('Connection refused')) {
-      return 'Không kết nối được server. Kiểm tra mạng hoặc backend đã chạy chưa.';
-    }
-    if (msg.contains('401')) return 'Email/SĐT hoặc mật khẩu không đúng.';
-    if (msg.contains('429')) return 'Quá nhiều lần thử. Vui lòng đợi.';
-    return 'Có lỗi xảy ra. Vui lòng thử lại.';
   }
 }
 
@@ -257,21 +233,17 @@ class _DemoCard extends StatelessWidget {
                   color: AppColors.accent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  'DEMO',
-                  style: TextStyle(
-                    color: AppColors.accent,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+                child: const Text('DEMO',
+                    style: TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    )),
               ),
               const SizedBox(width: 8),
-              const Text(
-                'Đăng nhập nhanh theo role',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-              ),
+              const Text('Đăng nhập nhanh theo role',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
             ],
           ),
           const SizedBox(height: 10),
@@ -296,20 +268,16 @@ class _DemoCard extends StatelessWidget {
               emoji: '🔧',
               label: 'Staff',
               color: AppColors.info,
-              onTap: () => onDemoLogin(
-                'staff@sportsbooking.local',
-                staffRole: StaffPortalRole.staff,
-              ),
+              onTap: () => onDemoLogin('staff@sportsbooking.local',
+                  staffRole: StaffPortalRole.staff),
             ),
             const SizedBox(width: 6),
             _DemoChip(
               emoji: '👑',
               label: 'Manager',
               color: const Color(0xFF8B5CF6),
-              onTap: () => onDemoLogin(
-                'manager@sportsbooking.local',
-                staffRole: StaffPortalRole.manager,
-              ),
+              onTap: () => onDemoLogin('manager@sportsbooking.local',
+                  staffRole: StaffPortalRole.manager),
             ),
           ]),
         ],
@@ -324,7 +292,8 @@ class _FieldLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        child: Text(text,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       );
 }
 
@@ -340,14 +309,12 @@ class _GoogleIcon extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
-      child: const Text(
-        'G',
-        style: TextStyle(
-          color: Color(0xFF4285F4),
-          fontWeight: FontWeight.w900,
-          fontSize: 13,
-        ),
-      ),
+      child: const Text('G',
+          style: TextStyle(
+            color: Color(0xFF4285F4),
+            fontWeight: FontWeight.w900,
+            fontSize: 13,
+          )),
     );
   }
 }
@@ -382,18 +349,45 @@ class _DemoChip extends StatelessWidget {
             children: [
               Text(emoji, style: const TextStyle(fontSize: 18)),
               const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: color,
-                ),
-              ),
+              Text(label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  )),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+  final String message;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+      ),
+      child: Text(message,
+          style: const TextStyle(color: AppColors.danger, fontSize: 13)),
+    );
+  }
+}
+
+String _friendlyError(Object? e) {
+  final msg = e?.toString() ?? '';
+  if (msg.contains('SocketException') || msg.contains('Connection refused')) {
+    return 'Không kết nối được server. Kiểm tra mạng hoặc backend đã chạy chưa.';
+  }
+  if (msg.contains('401')) return 'Email/SĐT hoặc mật khẩu không đúng.';
+  if (msg.contains('429')) return 'Quá nhiều lần thử. Vui lòng đợi.';
+  return 'Đăng nhập thất bại. Vui lòng thử lại.';
 }
