@@ -1,0 +1,33 @@
+{
+  "dart.flutterSdkPath": ".fvm/flutter_sdk",
+  "dart.lineLength": 100,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "[dart]": {
+    "editor.defaultFormatter": "Dart-Code.dart-code",
+    "editor.rulers": [100],
+    "editor.tabSize": 2
+  },
+  "files.watcherExclude": {
+    "**/.fvm": true,
+    "**/build/**": true
+  },
+  "search.exclude": {
+    "**/.fvm": true,
+    "**/build": true,
+    "**/*.g.dart": true,
+    "**/*.freezed.dart": true,
+    "lib/gen": true
+  },
+
+  // "// terminal — Windows": "Git Bash để `make` / unix tools chạy được. Mac/Linux không bị ảnh hưởng.",
+  // "terminal.integrated.defaultProfile.windows": "Git Bash",
+  // "terminal.integrated.profiles.windows": {
+  //   "Git Bash": {
+  //     "source": "Git Bash"
+  //   }
+  // }
+}

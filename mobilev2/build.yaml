@@ -1,0 +1,93 @@
+targets:
+  $default:
+    sources:
+      include:
+        - lib/**
+        - test/**
+        - pubspec.yaml
+        - assets/**
+        - $package$
+      exclude:
+        - "**/*.g.dart"
+        - "**/*.freezed.dart"
+        - "**/*.config.dart"
+        - "lib/gen/**"
+        - "bricks/**"
+        - "build/**"
+
+    builders:
+      # ─── JSON SERIALIZABLE ──────────────────────────────────────────
+      json_serializable:
+        options:
+          field_rename: snake
+          generic_argument_factories: true
+          explicit_to_json: true
+          include_if_null: false
+          checked: true
+          create_factory: true
+          create_to_json: true
+
+      # ─── FREEZED ────────────────────────────────────────────────────
+      freezed:
+        options:
+          union_key: type
+          union_value_case: snake
+          map: { map: true, when: true, maybe_map: true, maybe_when: true }
+          copy: true
+          equal: true
+          to_string: true
+
+      # ─── INJECTABLE ─────────────────────────────────────────────────
+      injectable_generator:injectable_builder:
+        options:
+          auto_register: false
+
+      injectable_generator:injectable_config_builder:
+        generate_for:
+          - lib/core/base/di/injection.dart
+
+      # ─── RETROFIT ───────────────────────────────────────────────────
+      retrofit_generator:retrofit:
+        generate_for:
+          - lib/**/data/services/**
+          - lib/**/data/datasources/**
+
+      # ─── RIVERPOD ───────────────────────────────────────────────────
+      riverpod_generator:
+        generate_for:
+          include:
+            - lib/**
+          exclude:
+            - "**/*.g.dart"
+            - "**/*.freezed.dart"
+
+      # ─── GO ROUTER BUILDER ──────────────────────────────────────────
+      go_router_builder:
+        generate_for:
+          - lib/routes/config/app_routes.dart
+
+      # ─── ENVIED ─────────────────────────────────────────────────────
+      envied_generator:envied:
+        generate_for:
+          - lib/config/env/**
+
+      # ─── GRAPHQL CODEGEN ────────────────────────────────────────────
+      # Sinh class type-safe từ *.graphql + schema.graphql.
+      # Mỗi feature có graphql riêng → add path vào generate_for.
+      graphql_codegen:
+        generate_for:
+          - lib/features/_reference/character/**
+        options:
+          scalars:
+            ID:
+              type: String
+            DateTime:
+              type: DateTime
+              fromJsonFunctionName: DateTime.parse
+              toJsonFunctionName: toIso8601String
+          clients:
+            - graphql_flutter
+
+      # ─── FLUTTER GEN ────────────────────────────────────────────────
+      flutter_gen_runner:
+        enabled: true

@@ -1,0 +1,10 @@
+{
+  "@@locale": "vi",
+  "appName": "flutter_base2",
+  "common_ok": "Đồng ý",
+  "common_cancel": "Huỷ",
+  "common_retry": "Thử lại",
+  "common_loading": "Đang tải...",
+  "common_empty": "Không có dữ liệu",
+  "common_error": "Đã xảy ra lỗi"
+}

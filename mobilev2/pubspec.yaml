@@ -1,0 +1,163 @@
+name: sports_booking_mobile
+description: "Sports Booking - mobile (v2 base)"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # ─────────────────────── STATE MANAGEMENT (Riverpod-only) ──────────────────────────
+  flutter_riverpod: ^3.3.1
+  riverpod_annotation: ^4.0.2
+  hooks_riverpod: ^3.3.1
+  flutter_hooks: ^0.21.0
+
+  # ─────────────────────── DEPENDENCY INJECTION ──────────────────────────
+  get_it: ^9.2.0
+  injectable: ^2.5.2
+  equatable: ^2.0.5
+
+  # ─────────────────────── NETWORK ──────────────────────────
+  dio: ^5.8.0+1
+  retrofit: ^4.9.2
+  pretty_dio_logger: ^1.4.0
+  internet_connection_checker_plus: ^2.5.2
+
+  # ─────────────────────── MODELS / SERIALIZATION ──────────────────────────
+  json_annotation: ^4.9.0
+  freezed_annotation: ^3.1.0
+
+  # ─────────────────────── ROUTING ──────────────────────────
+  go_router: ^17.0.0
+
+  # ─────────────────────── STORAGE ──────────────────────────
+  shared_preferences: ^2.5.3
+  flutter_secure_storage: ^10.0.0
+  flutter_cache_manager: ^3.4.1
+  path_provider: ^2.1.5
+
+  # ─────────────────────── FIREBASE ──────────────────────────
+  firebase_core: ^4.2.0
+  firebase_analytics: ^12.0.3
+  firebase_crashlytics: ^5.0.3
+  firebase_remote_config: ^6.1.0
+
+  # ─────────────────────── UI ──────────────────────────
+  cupertino_icons: ^1.0.8
+  google_fonts: ^8.0.0
+  flutter_svg: ^2.0.10+1
+  lottie: ^3.1.2
+  flutter_smart_dialog: ^5.1.0
+  toastification: ^2.3.0
+  flutter_screenutil: ^5.9.3
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+  visibility_detector: ^0.4.0+2
+
+  # ─────────────────────── LOCALIZATION ──────────────────────────
+  intl: ^0.20.2
+
+  # ─────────────────────── UTILS ──────────────────────────
+  package_info_plus: ^9.0.0
+  device_info_plus: ^12.2.0
+  url_launcher: ^6.3.2
+  jwt_decoder: ^2.0.1
+  permission_handler: ^12.0.1
+
+  # ─────────────────────── ENV (typed) ──────────────────────────
+  envied: ^1.3.1
+
+  # ─────────────────────── ADS & IAP ──────────────────────────
+  google_mobile_ads: ^7.0.0
+  purchases_flutter: ^10.0.1
+
+  # ─────────────────────── OPTIONAL (uncomment when needed) ──────────────────────────
+  image_picker: ^1.0.4
+  flutter_image_compress: ^2.4.0
+  flutter_local_notifications: ^20.0.0
+  # google_maps_flutter: ^2.14.2
+  graphql_flutter: ^5.2.1
+  # pin_code_fields: ^9.3.0
+  # carousel_slider: ^5.0.0
+  # badges: ^3.1.2
+  # flutter_rating_bar: ^4.0.1
+  quick_actions: ^1.0.7
+  # open_filex: ^4.7.0
+
+  # ─────────────────────── SPORTS BOOKING UI ──────────────────────────
+  # google_fonts, cached_network_image: đã khai báo phía trên — không lặp lại
+  qr_flutter: ^4.1.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # ─────────────────────── CODEGEN ──────────────────────────
+  build_runner: ^2.4.12
+  flutter_gen_runner: ^5.12.0
+  riverpod_generator: ^4.0.3
+  json_serializable: ^6.8.0
+  freezed: ^3.2.3
+  injectable_generator: ^2.6.1
+  retrofit_generator: ^10.2.5
+  go_router_builder: ^4.3.0
+  envied_generator: ^1.3.1
+  graphql_codegen: ^3.0.1
+
+  # ─────────────────────── LINT ──────────────────────────
+  flutter_lints: ^6.0.0
+  # custom_lint: ^0.8.1     # bật khi nâng Flutter ≥ 3.44 cùng riverpod_lint
+  # riverpod_lint: ^3.1.3    # disabled: requires Dart ≥ 3.10.
+  #                          # Cả 2 dòng trên hiện conflict với analyzer của go_router_builder ^4.3.0.
+
+  # ─────────────────────── TEST ──────────────────────────
+  mocktail: ^1.0.4
+  golden_toolkit: ^0.15.0
+
+  # ─────────────────────── TOOLING ──────────────────────────
+  flutter_flavorizr: ^2.4.1
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
+  rename: ^3.1.0
+  ansicolor: ^2.0.3   # cho tools/l10n_sync.dart
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/lottie/
+    - assets/fonts/
+
+  # ⚠️ Bundled Inter font — comment ra vì folder assets/fonts/inter/ đang rỗng.
+  # Để dùng:
+  #   1. Download Inter từ https://fonts.google.com/specimen/Inter (chọn 5 weight: 300/400/500/600/700)
+  #   2. Đặt 5 file .ttf vào assets/fonts/inter/
+  #   3. Uncomment block dưới
+  #
+  # Tạm thời app dùng `GoogleFonts.inter()` (runtime download) — đã có sẵn dep `google_fonts`.
+  #
+  # fonts:
+  #   - family: Inter
+  #     fonts:
+  #       - asset: assets/fonts/inter/Inter_18pt-Light.ttf
+  #         weight: 300
+  #       - asset: assets/fonts/inter/Inter_18pt-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/inter/Inter_18pt-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/inter/Inter_18pt-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/inter/Inter_18pt-Bold.ttf
+  #         weight: 700

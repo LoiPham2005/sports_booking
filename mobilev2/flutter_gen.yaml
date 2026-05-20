@@ -1,0 +1,20 @@
+flutter_gen:
+  output: lib/gen/
+  line_length: 100
+  null_safety: true
+
+  integrations:
+    flutter_svg: true
+    lottie: true
+
+  assets:
+    enabled: true
+    outputs:
+      package_parameter_enabled: false
+      style: dot-delimiter
+      class_name: Assets
+
+  fonts:
+    enabled: true
+    outputs:
+      class_name: FontFamily

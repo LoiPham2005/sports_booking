@@ -1,0 +1,11 @@
+# Mason CLI bricks registry — flutter_base2 scaffolds.
+#
+# Cài Mason:  dart pub global activate mason_cli
+# Sync brick: mason get
+# Generate:   make feature-lean name=product
+#             (hoặc trực tiếp: mason make feature_lean --name product)
+bricks:
+  feature_lean:
+    path: bricks/feature_lean
+  # feature_full: bật khi cần scaffold với Domain layer (UseCase + Repository)
+  #   path: bricks/feature_full

@@ -1,0 +1,13 @@
+{
+  "@@locale": "en",
+  "appName": "flutter_base2",
+  "@appName": {
+    "description": "Application name"
+  },
+  "common_ok": "OK",
+  "common_cancel": "Cancel",
+  "common_retry": "Retry",
+  "common_loading": "Loading...",
+  "common_empty": "No data",
+  "common_error": "Something went wrong"
+}

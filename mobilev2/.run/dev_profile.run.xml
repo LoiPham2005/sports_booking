@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="⚡ dev (profile)" type="FlutterRunConfigurationType" factoryName="Flutter" singleton="true">
+    <option name="filePath" value="$PROJECT_DIR$/lib/main_dev.dart" />
+    <option name="buildFlavor" value="dev" />
+    <option name="additionalArgs" value="--profile --dart-define=ENV=dev" />
+    <method v="2" />
+  </configuration>
+</component>

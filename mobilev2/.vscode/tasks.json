@@ -1,0 +1,242 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "featureName",
+      "type": "promptString",
+      "description": "Feature name (snake_case, vd: user_profile)",
+      "default": "my_feature"
+    },
+    {
+      "id": "pkgName",
+      "type": "promptString",
+      "description": "New Dart package name (snake_case, vd: my_app)"
+    },
+    {
+      "id": "appName",
+      "type": "promptString",
+      "description": "App display name (vd: My App)"
+    },
+    {
+      "id": "bundleId",
+      "type": "promptString",
+      "description": "Bundle ID (vd: com.example.app)"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "📦 Deps: Get",
+      "type": "shell",
+      "command": "make get",
+      "problemMatcher": [],
+      "detail": "fvm flutter pub get"
+    },
+    {
+      "label": "📦 Deps: Clean",
+      "type": "shell",
+      "command": "make clean",
+      "problemMatcher": [],
+      "detail": "fvm flutter clean"
+    },
+    {
+      "label": "📦 Deps: Upgrade (major)",
+      "type": "shell",
+      "command": "make upgrade",
+      "problemMatcher": [],
+      "detail": "fvm flutter pub upgrade --major-versions"
+    },
+
+    {
+      "label": "⚡ Codegen: Build",
+      "type": "shell",
+      "command": "make gen",
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true },
+      "detail": "build_runner build --delete-conflicting-outputs"
+    },
+    {
+      "label": "⚡ Codegen: Watch",
+      "type": "shell",
+      "command": "make watch",
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "panel": "dedicated", "reveal": "always" },
+      "detail": "build_runner watch — chạy nền, re-gen khi file thay đổi"
+    },
+    {
+      "label": "🌐 L10n: Generate",
+      "type": "shell",
+      "command": "make l10n",
+      "problemMatcher": [],
+      "detail": "fvm flutter gen-l10n — sinh AppLocalizations từ ARB"
+    },
+    {
+      "label": "🌐 L10n: Sync (copy missing keys)",
+      "type": "shell",
+      "command": "make l10n-sync",
+      "problemMatcher": [],
+      "detail": "Copy key thiếu từ app_en.arb sang locale khác"
+    },
+    {
+      "label": "🌐 L10n: Sync + Auto-translate",
+      "type": "shell",
+      "command": "make l10n-sync-translate",
+      "problemMatcher": [],
+      "detail": "Sync + Google Translate giá trị + gen-l10n"
+    },
+    {
+      "label": "🔥 Full Gen (Clean + Get + L10n + Gen)",
+      "type": "shell",
+      "command": "make full-gen",
+      "problemMatcher": [],
+      "detail": "Workflow toàn diện — chạy sau khi pull / đổi dependency lớn"
+    },
+
+    {
+      "label": "🎨 Native: Flavorizr (regen flavors)",
+      "type": "shell",
+      "command": "make gen-flavor",
+      "problemMatcher": [],
+      "detail": "⚠️ Chỉ chạy khi sửa flavorizr.yaml — có thể overwrite native config"
+    },
+    {
+      "label": "🎨 Native: Launcher Icons",
+      "type": "shell",
+      "command": "make gen-icons",
+      "problemMatcher": [],
+      "detail": "flutter_launcher_icons — regen từ assets/icons/"
+    },
+    {
+      "label": "🎨 Native: Splash Screen",
+      "type": "shell",
+      "command": "make gen-splash",
+      "problemMatcher": [],
+      "detail": "flutter_native_splash:create"
+    },
+
+    {
+      "label": "🔍 Quality: Analyze",
+      "type": "shell",
+      "command": "make analyze",
+      "problemMatcher": ["$dart"],
+      "detail": "fvm flutter analyze — fail nếu có error"
+    },
+    {
+      "label": "💅 Quality: Format",
+      "type": "shell",
+      "command": "make format",
+      "problemMatcher": [],
+      "detail": "dart format ."
+    },
+    {
+      "label": "🩹 Quality: Fix (auto-apply)",
+      "type": "shell",
+      "command": "make fix",
+      "problemMatcher": [],
+      "detail": "dart fix --apply — auto fix lint warnings"
+    },
+
+    {
+      "label": "🧪 Test: All",
+      "type": "shell",
+      "command": "make test",
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": true },
+      "detail": "fvm flutter test"
+    },
+    {
+      "label": "📈 Test: Coverage (HTML)",
+      "type": "shell",
+      "command": "make cov",
+      "problemMatcher": [],
+      "detail": "Test + lcov → coverage/html/index.html (cần `brew install lcov`)"
+    },
+
+    {
+      "label": "🚀 Run: Dev",
+      "type": "shell",
+      "command": "make run-dev",
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "panel": "dedicated", "reveal": "always" },
+      "detail": "flutter run --flavor dev -t main_dev.dart"
+    },
+    {
+      "label": "🚀 Run: Stg",
+      "type": "shell",
+      "command": "make run-stg",
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "panel": "dedicated", "reveal": "always" },
+      "detail": "flutter run --flavor stg -t main_stg.dart"
+    },
+    {
+      "label": "🚀 Run: Prod",
+      "type": "shell",
+      "command": "make run-prod",
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "panel": "dedicated", "reveal": "always" },
+      "detail": "flutter run --flavor prod -t main_prod.dart"
+    },
+
+    {
+      "label": "📱 Build: APK Dev",
+      "type": "shell",
+      "command": "make apk-dev",
+      "problemMatcher": [],
+      "detail": "APK release — flavor dev"
+    },
+    {
+      "label": "📱 Build: APK Stg",
+      "type": "shell",
+      "command": "make apk-stg",
+      "problemMatcher": [],
+      "detail": "APK release — flavor stg"
+    },
+    {
+      "label": "📱 Build: APK Prod",
+      "type": "shell",
+      "command": "make apk-prod",
+      "problemMatcher": [],
+      "detail": "APK release — flavor prod"
+    },
+    {
+      "label": "📱 Build: AAB Prod (Play Store)",
+      "type": "shell",
+      "command": "make aab-prod",
+      "problemMatcher": [],
+      "detail": "App Bundle release — submit Play Store"
+    },
+
+    {
+      "label": "🧱 Scaffold: Feature (Lean)",
+      "type": "shell",
+      "command": "make feature-lean name=${input:featureName}",
+      "problemMatcher": [],
+      "detail": "Mason brick — data/services + presentation/providers + pages"
+    },
+
+    {
+      "label": "🛠 Rename: Package",
+      "type": "shell",
+      "command": "make rename-package name=${input:pkgName}",
+      "problemMatcher": [],
+      "detail": "Đổi `name:` ở pubspec.yaml + tất cả `package:xxx/` imports"
+    },
+    {
+      "label": "🛠 Rename: App Display Name",
+      "type": "shell",
+      "command": "make rename-app name=${input:appName}",
+      "problemMatcher": [],
+      "detail": "Đổi tên app hiển thị Android/iOS"
+    },
+    {
+      "label": "🛠 Rename: Bundle ID",
+      "type": "shell",
+      "command": "make rename-bundle-id name=${input:bundleId}",
+      "problemMatcher": [],
+      "detail": "Đổi applicationId Android + Bundle Identifier iOS"
+    }
+  ]
+}

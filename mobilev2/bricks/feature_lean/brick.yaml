@@ -1,0 +1,20 @@
+name: feature_lean
+description: |
+  Scaffold 1 feature lean theo pattern flutter_base2 (Riverpod + Freezed +
+  Retrofit + HookConsumerWidget). Sinh đầy đủ:
+    - Model (@freezed + json_serializable)
+    - Service (@RestApi với Retrofit)
+    - Notifier (extends _$ + BaseNotifier mixin — list pattern)
+    - List Page (HookConsumerWidget với switch state pattern)
+
+version: 0.1.0+1
+
+environment:
+  mason: ">=0.1.0 <1.0.0"
+
+vars:
+  name:
+    type: string
+    description: Tên feature singular dạng snake_case (vd. product, voucher, order)
+    prompt: 📦 Tên feature (snake_case, dạng số ít)?
+    default: example

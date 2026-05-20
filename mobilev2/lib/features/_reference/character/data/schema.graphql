@@ -1,0 +1,42 @@
+# Schema cho Rick & Morty GraphQL API (subset — chỉ types ta dùng).
+# https://rickandmortyapi.com/graphql
+#
+# Khi backend nội bộ có /graphql:
+#   1. Introspect schema từ server (vd. `npx graphql-cli get-schema`)
+#   2. Replace file này, hoặc gen tự động qua build pipeline.
+
+type Query {
+  characters(page: Int, filter: FilterCharacter): Characters
+  character(id: ID!): Character
+}
+
+type Characters {
+  info: Info
+  results: [Character]
+}
+
+type Info {
+  count: Int
+  pages: Int
+  next: Int
+  prev: Int
+}
+
+type Character {
+  id: ID
+  name: String
+  status: String
+  species: String
+  type: String
+  gender: String
+  image: String
+  created: String
+}
+
+input FilterCharacter {
+  name: String
+  status: String
+  species: String
+  type: String
+  gender: String
+}
