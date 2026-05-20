@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../shared/mock/mock_data.dart';
 import '../../../shared/routing/route_paths.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/utils/format.dart';
+import 'data/models/availability_dto.dart';
+import 'presentation/providers/venue_availability_notifier.dart';
 
 enum MatrixAxis { timeRows, courtRows }
 
-class BookingMatrix extends StatefulWidget {
+class BookingMatrix extends ConsumerStatefulWidget {
   final Venue venue;
   const BookingMatrix({super.key, required this.venue});
 
   @override
-  State<BookingMatrix> createState() => _BookingMatrixState();
+  ConsumerState<BookingMatrix> createState() => _BookingMatrixState();
 }
 
-enum _CellStatus { available, held, booked }
+enum _CellStatus { available, held, booked, closed }
 
 class _SlotKey {
   final String courtId;
@@ -32,52 +35,37 @@ class _SlotKey {
   int get hashCode => Object.hash(courtId, hour);
 }
 
-class _BookingMatrixState extends State<BookingMatrix> {
+class _BookingMatrixState extends ConsumerState<BookingMatrix> {
   DateTime _date = DateTime.now();
   final Set<_SlotKey> _selected = {};
   MatrixAxis _axis = MatrixAxis.timeRows;
   final _voucherCtrl = TextEditingController();
 
-  // Mock courts cho venue — phân biệt với COURTS chung
-  static const _courts = [
-    ('c1', 'Sân 1', 300000),
-    ('c2', 'Sân 2', 300000),
-    ('c3', 'Sân 3', 350000),
-    ('c4', 'Sân 4', 400000),
-    ('c5', 'Sân VIP 1', 500000),
-    ('c6', 'Sân VIP 2', 500000),
-  ];
+  // Derived từ availability response — populated trong build().
+  List<({String id, String name, int price})> _courts = const [];
+  List<String> _hours = const [];
+  Map<String, AvailabilityCellDto> _cellMap = const {};
 
-  /// Mock status per (court, hour).
+  String get _dateString =>
+      '${_date.year.toString().padLeft(4, '0')}-'
+      '${_date.month.toString().padLeft(2, '0')}-'
+      '${_date.day.toString().padLeft(2, '0')}';
+
   _CellStatus _statusFor(String courtId, String hour) {
-    final h = int.parse(hour.split(':')[0]);
-    if (h == 18) {
-      if (['c1', 'c2', 'c5'].contains(courtId)) return _CellStatus.booked;
-      if (courtId == 'c3') return _CellStatus.held;
-    }
-    if (h == 19) return _CellStatus.booked;
-    if (h == 20) {
-      if (['c2', 'c3', 'c5'].contains(courtId)) return _CellStatus.booked;
-      if (courtId == 'c1') return _CellStatus.held;
-    }
-    if (h == 17) {
-      if (courtId == 'c2') return _CellStatus.booked;
-      if (courtId == 'c5') return _CellStatus.held;
-    }
-    if (h == 15 && courtId == 'c1') return _CellStatus.booked;
-    if (h == 16 && courtId == 'c3') return _CellStatus.booked;
-    if (h == 8 && (courtId == 'c2' || courtId == 'c4' || courtId == 'c6')) {
-      return _CellStatus.booked;
-    }
-    if (h == 9 && courtId == 'c4') return _CellStatus.held;
-    if (h == 21 && (courtId == 'c1' || courtId == 'c5')) return _CellStatus.booked;
-    return _CellStatus.available;
+    final cell = _cellMap['${courtId}__$hour'];
+    return switch (cell?.status) {
+      'booked' => _CellStatus.booked,
+      'held' => _CellStatus.held,
+      'closed' => _CellStatus.closed,
+      _ => _CellStatus.available,
+    };
   }
 
-  int get _subtotal => _selected.fold(0, (sum, s) {
-        final c = _courts.firstWhere((c) => c.$1 == s.courtId);
-        return sum + c.$3;
-      });
+  int _priceFor(String courtId, String hour) =>
+      _cellMap['${courtId}__$hour']?.price ?? 0;
+
+  int get _subtotal =>
+      _selected.fold(0, (sum, s) => sum + _priceFor(s.courtId, s.hour));
 
   int get _discount =>
       _voucherCtrl.text.trim().toLowerCase() == 'sport20' && _subtotal > 0
@@ -106,6 +94,10 @@ class _BookingMatrixState extends State<BookingMatrix> {
 
   @override
   Widget build(BuildContext context) {
+    final asyncAvail = ref.watch(
+      venueAvailabilityProvider(venueId: widget.venue.id, date: _dateString),
+    );
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -120,15 +112,29 @@ class _BookingMatrixState extends State<BookingMatrix> {
           const Divider(height: 1, color: AppColors.border),
           SizedBox(
             height: 380,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
-                padding: const EdgeInsets.all(12),
-                child: _axis == MatrixAxis.timeRows
-                    ? _buildTimeRowsTable()
-                    : _buildCourtRowsTable(),
+            child: asyncAvail.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text('Lỗi tải lịch: $e',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.danger)),
+                ),
               ),
+              data: (avail) {
+                _populateFrom(avail);
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    padding: const EdgeInsets.all(12),
+                    child: _axis == MatrixAxis.timeRows
+                        ? _buildTimeRowsTable()
+                        : _buildCourtRowsTable(),
+                  ),
+                );
+              },
             ),
           ),
           if (_selected.isNotEmpty) _buildSelectedChips(),
@@ -137,6 +143,24 @@ class _BookingMatrixState extends State<BookingMatrix> {
         ],
       ),
     );
+  }
+
+  /// Populate `_courts`/`_hours`/`_cellMap` từ availability response.
+  /// Gọi mỗi lần data đổi — KHÔNG setState (đang trong build).
+  void _populateFrom(AvailabilityDto avail) {
+    _courts = avail.courts.map((c) {
+      final firstPrice = c.cells.isNotEmpty ? c.cells.first.price : 0;
+      return (id: c.id, name: c.name, price: firstPrice);
+    }).toList();
+
+    _hours = avail.courts.isNotEmpty
+        ? avail.courts.first.cells.map((c) => c.hour).toList()
+        : const [];
+
+    _cellMap = {
+      for (final c in avail.courts)
+        for (final cell in c.cells) '${c.id}__${cell.hour}': cell,
+    };
   }
 
   Widget _buildHeader() {
@@ -269,24 +293,24 @@ class _BookingMatrixState extends State<BookingMatrix> {
           children: [
             const _HeaderCell(text: 'GIỜ', isCorner: true),
             ..._courts.map((c) => _HeaderCell(
-                  text: c.$2,
-                  subtext: '${(c.$3 / 1000).toInt()}k/h',
+                  text: c.name,
+                  subtext: '${(c.price / 1000).toInt()}k/h',
                 )),
           ],
         ),
         // Rows
-        for (final hour in MockData.timeSlots)
+        for (final hour in _hours)
           TableRow(
             children: [
               _RowLabel(text: hour),
               ..._courts.map((c) {
-                final status = _statusFor(c.$1, hour);
-                final isSel = _selected.contains(_SlotKey(c.$1, hour));
+                final status = _statusFor(c.id, hour);
+                final isSel = _selected.contains(_SlotKey(c.id, hour));
                 return _MatrixCell(
                   status: status,
                   selected: isSel,
-                  price: c.$3,
-                  onTap: () => _toggle(c.$1, hour),
+                  price: c.price,
+                  onTap: () => _toggle(c.id, hour),
                 );
               }),
             ],
@@ -304,22 +328,22 @@ class _BookingMatrixState extends State<BookingMatrix> {
         TableRow(
           children: [
             const _HeaderCell(text: 'SÂN', isCorner: true),
-            ...MockData.timeSlots.map((h) => _HeaderCell(text: h)),
+            ..._hours.map((h) => _HeaderCell(text: h)),
           ],
         ),
         // Rows
         for (final c in _courts)
           TableRow(
             children: [
-              _RowLabel(text: c.$2, subtext: '${(c.$3 / 1000).toInt()}k/h'),
-              ...MockData.timeSlots.map((hour) {
-                final status = _statusFor(c.$1, hour);
-                final isSel = _selected.contains(_SlotKey(c.$1, hour));
+              _RowLabel(text: c.name, subtext: '${(c.price / 1000).toInt()}k/h'),
+              ..._hours.map((hour) {
+                final status = _statusFor(c.id, hour);
+                final isSel = _selected.contains(_SlotKey(c.id, hour));
                 return _MatrixCell(
                   status: status,
                   selected: isSel,
-                  price: c.$3,
-                  onTap: () => _toggle(c.$1, hour),
+                  price: c.price,
+                  onTap: () => _toggle(c.id, hour),
                 );
               }),
             ],
@@ -348,7 +372,7 @@ class _BookingMatrixState extends State<BookingMatrix> {
             spacing: 6,
             runSpacing: 6,
             children: list.map((s) {
-              final c = _courts.firstWhere((c) => c.$1 == s.courtId);
+              final c = _courts.firstWhere((c) => c.id == s.courtId);
               return InkWell(
                 onTap: () => _toggle(s.courtId, s.hour),
                 borderRadius: BorderRadius.circular(20),
@@ -360,7 +384,7 @@ class _BookingMatrixState extends State<BookingMatrix> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '${c.$2} · ${s.hour}  ×',
+                    '${c.name} · ${s.hour}  ×',
                     style: const TextStyle(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
