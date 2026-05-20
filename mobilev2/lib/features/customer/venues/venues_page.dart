@@ -1,23 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../shared/mock/mock_data.dart';
 import '../../../shared/routing/route_paths.dart';
 import '../../../shared/routing/safe_pop.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/widgets/venue_card.dart';
+import 'presentation/providers/venues_notifier.dart';
 
-class VenuesPage extends StatefulWidget {
+class VenuesPage extends ConsumerStatefulWidget {
   final bool isTab;
   const VenuesPage({super.key, this.isTab = false});
 
   @override
-  State<VenuesPage> createState() => _VenuesPageState();
+  ConsumerState<VenuesPage> createState() => _VenuesPageState();
 }
 
-class _VenuesPageState extends State<VenuesPage> {
+class _VenuesPageState extends ConsumerState<VenuesPage> {
   String _selectedSport = '';
   String _sort = 'distance';
+
+  void _applyFilter() {
+    ref.read(venuesProvider.notifier).apply(
+          VenuesFilter(
+            sportSlug: _selectedSport.isEmpty ? null : _selectedSport,
+            sortBy: _sort == 'distance' ? null : _sort,
+          ),
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,14 +110,14 @@ class _VenuesPageState extends State<VenuesPage> {
                       return _Chip(
                         label: 'Tất cả',
                         active: _selectedSport.isEmpty,
-                        onTap: () => setState(() => _selectedSport = ''),
+                        onTap: () { setState(() => _selectedSport = ''); _applyFilter(); },
                       );
                     }
                     final s = MockData.sports[i - 1];
                     return _Chip(
                       label: '${s.icon} ${s.name}',
                       active: _selectedSport == s.slug,
-                      onTap: () => setState(() => _selectedSport = s.slug),
+                      onTap: () { setState(() => _selectedSport = s.slug); _applyFilter(); },
                     );
                   },
                 ),
@@ -120,7 +131,7 @@ class _VenuesPageState extends State<VenuesPage> {
                 child: Row(
                   children: [
                     Text(
-                      '${MockData.venues.length} sân',
+                      '${ref.watch(venuesProvider).value?.length ?? 0} sân',
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const Spacer(),
@@ -173,20 +184,47 @@ class _VenuesPageState extends State<VenuesPage> {
               ),
             ),
 
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, widget.isTab ? 90 : 24),
-              sliver: SliverList.separated(
-                itemCount: MockData.venues.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 14),
-                itemBuilder: (_, i) {
-                  final v = MockData.venues[i];
-                  return VenueCard(
-                    venue: v,
-                    onTap: () => context.push(RoutePaths.venueDetail(v.id)),
-                  );
-                },
-              ),
-            ),
+            // List venues từ provider — handle loading/error/empty.
+            ref.watch(venuesProvider).when(
+                  data: (venues) => venues.isEmpty
+                      ? const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(child: Text('Không tìm thấy sân')),
+                        )
+                      : SliverPadding(
+                          padding: EdgeInsets.fromLTRB(
+                              20, 0, 20, widget.isTab ? 90 : 24),
+                          sliver: SliverList.separated(
+                            itemCount: venues.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 14),
+                            itemBuilder: (_, i) {
+                              final v = venues[i];
+                              return VenueCard(
+                                venue: v,
+                                onTap: () => context
+                                    .push(RoutePaths.venueDetail(v.id)),
+                              );
+                            },
+                          ),
+                        ),
+                  loading: () => const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (e, _) => SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'Lỗi: $e',
+                          style: const TextStyle(color: AppColors.danger),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
           ],
         ),
       ),
@@ -242,6 +280,7 @@ class _VenuesPageState extends State<VenuesPage> {
                 trailing: _sort == opt.$1 ? const Icon(Icons.check, color: AppColors.primary) : null,
                 onTap: () {
                   setState(() => _sort = opt.$1);
+                  _applyFilter();
                   Navigator.pop(context);
                 },
               ),

@@ -10,6 +10,7 @@ import '../../../shared/widgets/sport_chip.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/widgets/venue_card.dart';
 import '../sports/presentation/providers/sports_notifier.dart';
+import '../venues/presentation/providers/venues_notifier.dart';
 
 class HomeTab extends ConsumerWidget {
   const HomeTab({super.key});
@@ -263,20 +264,29 @@ class HomeTab extends ConsumerWidget {
           SliverToBoxAdapter(
             child: SizedBox(
               height: 250,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                scrollDirection: Axis.horizontal,
-                itemCount: MockData.venues.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (_, i) => VenueCardCompact(
-                  venue: MockData.venues[i],
-                  onTap: () => context.push(RoutePaths.venueDetail(MockData.venues[i].id)),
-                ),
-              ),
+              child: ref.watch(featuredVenuesProvider()).when(
+                    data: (venues) => ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: venues.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (_, i) => VenueCardCompact(
+                        venue: venues[i],
+                        onTap: () => context
+                            .push(RoutePaths.venueDetail(venues[i].id)),
+                      ),
+                    ),
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(
+                      child: Text('Lỗi: $e',
+                          style: const TextStyle(
+                              color: AppColors.danger, fontSize: 12)),
+                    ),
+                  ),
             ),
           ),
 
-          // Featured (vertical)
+          // Featured (vertical) — top 3 rating
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
             sliver: SliverToBoxAdapter(
@@ -285,17 +295,31 @@ class HomeTab extends ConsumerWidget {
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 90),
-            sliver: SliverList.separated(
-              itemCount: 3,
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
-              itemBuilder: (_, i) {
-                final v = MockData.venues[i + 1];
-                return VenueCard(
-                  venue: v,
-                  onTap: () => context.push(RoutePaths.venueDetail(v.id)),
-                );
-              },
-            ),
+            sliver: ref.watch(featuredVenuesProvider(limit: 3)).when(
+                  data: (venues) => SliverList.separated(
+                    itemCount: venues.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 14),
+                    itemBuilder: (_, i) => VenueCard(
+                      venue: venues[i],
+                      onTap: () =>
+                          context.push(RoutePaths.venueDetail(venues[i].id)),
+                    ),
+                  ),
+                  loading: () => const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+                  error: (e, _) => SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text('Lỗi: $e',
+                          style:
+                              const TextStyle(color: AppColors.danger)),
+                    ),
+                  ),
+                ),
           ),
         ],
       ),
