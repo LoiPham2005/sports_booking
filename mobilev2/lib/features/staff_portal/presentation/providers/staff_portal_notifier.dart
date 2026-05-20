@@ -4,6 +4,7 @@ import 'package:sports_booking_mobile/core/base/riverpod/base_notifier.dart';
 import 'package:sports_booking_mobile/core/common/constants/app_config.dart';
 import 'package:sports_booking_mobile/features/customer/bookings/data/models/booking_dto.dart';
 import 'package:sports_booking_mobile/features/customer/bookings/presentation/providers/bookings_notifier.dart';
+import 'package:sports_booking_mobile/features/owner/staff/data/models/staff_dto.dart';
 import 'package:sports_booking_mobile/features/staff_portal/data/models/staff_portal_dtos.dart';
 import 'package:sports_booking_mobile/features/staff_portal/data/services/staff_portal_service.dart';
 import 'package:sports_booking_mobile/shared/mock/mock_data.dart';
@@ -106,6 +107,50 @@ Future<RevenueResponse> staffRevenue(Ref ref, {String? date}) async {
     );
   }
   return StaffPortalService(ref.read(dioProvider)).revenue(date: date);
+}
+
+/// Team (Manager-only read) — list staff cùng venue.
+@riverpod
+Future<List<StaffMemberDto>> staffTeam(Ref ref, {String? venueId}) async {
+  if (AppConfig.useMock) {
+    return const [
+      StaffMemberDto(
+        id: 't1',
+        venueId: 'v1',
+        userId: 'u1',
+        email: 'mai@example.com',
+        role: 'STAFF',
+        inviteStatus: 'ACTIVE',
+        createdAt: '2025-01-04T00:00:00.000Z',
+        acceptedAt: '2025-01-04T00:00:00.000Z',
+        venue: StaffVenueInline(id: 'v1', name: 'Sân Phú Mỹ Hưng'),
+        user: StaffUserInline(
+          id: 'u1',
+          fullName: 'Lê Thị Mai',
+          email: 'mai@example.com',
+          phone: '+84 909 876 543',
+        ),
+      ),
+      StaffMemberDto(
+        id: 't2',
+        venueId: 'v1',
+        userId: 'u2',
+        email: 'long@example.com',
+        role: 'STAFF',
+        inviteStatus: 'ACTIVE',
+        createdAt: '2026-05-10T00:00:00.000Z',
+        acceptedAt: '2026-05-10T00:00:00.000Z',
+        venue: StaffVenueInline(id: 'v1', name: 'Sân Phú Mỹ Hưng'),
+        user: StaffUserInline(
+          id: 'u2',
+          fullName: 'Phạm Hoàng Long',
+          email: 'long@example.com',
+          phone: '+84 908 333 444',
+        ),
+      ),
+    ];
+  }
+  return StaffPortalService(ref.read(dioProvider)).team(venueId: venueId);
 }
 
 /// Pricing overrides notifier — list + create + delete.

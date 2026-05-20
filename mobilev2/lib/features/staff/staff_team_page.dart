@@ -1,32 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
+import '../auth/presentation/providers/auth_notifier.dart';
+import '../owner/staff/data/models/staff_dto.dart';
+import '../staff_portal/presentation/providers/staff_portal_notifier.dart';
 
-class StaffTeamPage extends StatelessWidget {
+class StaffTeamPage extends ConsumerWidget {
   const StaffTeamPage({super.key});
 
-  static const _team = [
-    (
-      'Lê Thị Mai',
-      'mai@example.com',
-      '+84 909 876 543',
-      'STAFF',
-      '2025-01-04',
-      215,
-    ),
-    (
-      'Phạm Hoàng Long',
-      'long@example.com',
-      '+84 908 333 444',
-      'STAFF',
-      '2026-05-10',
-      12,
-    ),
-  ];
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final memberships = ref.watch(staffMembershipsProvider).value ?? const [];
+    final venueId = memberships.isNotEmpty ? memberships.first.venueId : null;
+    final venueName = memberships.isNotEmpty
+        ? memberships.first.venue.name
+        : 'venue';
+    final user = ref.watch(currentUserProvider);
+    final asyncTeam =
+        ref.watch(staffTeamProvider(venueId: venueId));
+    final team = asyncTeam.value ?? const <StaffMemberDto>[];
+    // Loại current user khỏi danh sách "khác".
+    final others = team.where((m) => m.user?.id != user?.id).toList();
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -68,78 +65,73 @@ class StaffTeamPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Text('Đội ngũ tại Sân bóng đá Phú Mỹ Hưng',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          Text('Đội ngũ tại $venueName',
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 13)),
 
           const SizedBox(height: 20),
 
           // "Bạn" highlight card
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF8B5CF6).withValues(alpha: 0.08),
-                  const Color(0xFF6D28D9).withValues(alpha: 0.04),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: const Color(0xFF8B5CF6),
-                  child: const Text('M',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800)),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Text('Bạn (Manager)',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w800, fontSize: 15)),
-                          SizedBox(width: 6),
-                          Icon(Icons.verified,
-                              color: Color(0xFF7C3AED), size: 14),
-                        ],
-                      ),
-                      Text('manager@sportsbooking.local',
-                          style: TextStyle(
-                              color: AppColors.textMuted, fontSize: 12)),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('421',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 16)),
-                    Text('bookings',
-                        style: const TextStyle(
-                            color: AppColors.textMuted, fontSize: 10)),
+          if (user != null)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF8B5CF6).withValues(alpha: 0.08),
+                    const Color(0xFF6D28D9).withValues(alpha: 0.04),
                   ],
                 ),
-              ],
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0xFF8B5CF6),
+                    child: Text(
+                      user.fullName.isNotEmpty
+                          ? user.fullName[0].toUpperCase()
+                          : 'M',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Text('${user.fullName} (Bạn)',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15)),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.verified,
+                                color: Color(0xFF7C3AED), size: 14),
+                          ],
+                        ),
+                        Text(user.email ?? user.phone ?? '',
+                            style: const TextStyle(
+                                color: AppColors.textMuted, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
 
           const SizedBox(height: 20),
 
           Text(
-            'CÁC NHÂN VIÊN KHÁC (${_team.length})',
+            'CÁC NHÂN VIÊN KHÁC (${others.length})',
             style: const TextStyle(
               color: AppColors.textMuted,
               fontSize: 11,
@@ -149,109 +141,22 @@ class StaffTeamPage extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          ..._team.map((s) => Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor:
-                          AppColors.primary.withValues(alpha: 0.15),
-                      child: Text(s.$1[0],
-                          style: const TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16)),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  s.$1,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w800, fontSize: 14),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.shield_outlined,
-                                        color: AppColors.primary, size: 10),
-                                    const SizedBox(width: 3),
-                                    Text(s.$4,
-                                        style: const TextStyle(
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 10)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(s.$2,
-                              style: const TextStyle(
-                                  color: AppColors.textMuted, fontSize: 12)),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(Icons.event_available_outlined,
-                                  size: 12, color: AppColors.textSecondary),
-                              const SizedBox(width: 4),
-                              Text('${s.$6} bookings',
-                                  style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.textSecondary)),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.calendar_today_outlined,
-                                  size: 12, color: AppColors.textSecondary),
-                              const SizedBox(width: 4),
-                              Text('Vào ${s.$5}',
-                                  style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.textSecondary)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Material(
-                      color: AppColors.success.withValues(alpha: 0.12),
-                      shape: const CircleBorder(),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () {},
-                        child: const SizedBox(
-                          height: 36,
-                          width: 36,
-                          child: Icon(Icons.phone,
-                              color: AppColors.success, size: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
+          if (others.isEmpty && asyncTeam.isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 30),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (others.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Text('Chưa có nhân viên khác',
+                    style:
+                        TextStyle(color: AppColors.textMuted, fontSize: 13)),
+              ),
+            )
+          else
+            ...others.map((m) => _MemberTile(member: m)),
 
           const SizedBox(height: 12),
           Container(
@@ -275,6 +180,133 @@ class StaffTeamPage extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MemberTile extends StatelessWidget {
+  final StaffMemberDto member;
+  const _MemberTile({required this.member});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = member.user?.fullName ?? member.email ?? '(chưa accept)';
+    final email = member.user?.email ?? member.email ?? '';
+    final phone = member.user?.phone ?? '';
+    final joinedAt = member.acceptedAt ?? member.createdAt;
+    final joinedDate = joinedAt.split('T').first;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+            child: Text(
+              name.isNotEmpty ? name[0].toUpperCase() : '?',
+              style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 14),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.shield_outlined,
+                              color: AppColors.primary, size: 10),
+                          const SizedBox(width: 3),
+                          Text(member.role,
+                              style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(email,
+                    style: const TextStyle(
+                        color: AppColors.textMuted, fontSize: 12)),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined,
+                        size: 12, color: AppColors.textSecondary),
+                    const SizedBox(width: 4),
+                    Text('Vào $joinedDate',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary)),
+                    if (member.inviteStatus != 'ACTIVE') ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(member.inviteStatus,
+                            style: const TextStyle(
+                                color: AppColors.warning,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (phone.isNotEmpty)
+            Material(
+              color: AppColors.success.withValues(alpha: 0.12),
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () {},
+                child: const SizedBox(
+                  height: 36,
+                  width: 36,
+                  child: Icon(Icons.phone,
+                      color: AppColors.success, size: 16),
+                ),
+              ),
+            ),
         ],
       ),
     );

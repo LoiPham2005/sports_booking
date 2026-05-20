@@ -1,38 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/widgets/status_badge.dart';
+import '../staff_portal/presentation/providers/staff_portal_notifier.dart';
 
-class StaffScheduleTab extends StatefulWidget {
+class StaffScheduleTab extends ConsumerStatefulWidget {
   const StaffScheduleTab({super.key});
 
   @override
-  State<StaffScheduleTab> createState() => _StaffScheduleTabState();
+  ConsumerState<StaffScheduleTab> createState() => _StaffScheduleTabState();
 }
 
-class _StaffScheduleTabState extends State<StaffScheduleTab> {
+class _StaffScheduleTabState extends ConsumerState<StaffScheduleTab> {
   DateTime _date = DateTime.now();
 
+  static const _hourStart = 6;
   static const _hours = [
     '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
     '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
     '20:00', '21:00',
   ];
 
-  bool _hasBooking(int hour) {
-    return hour == 1 || hour == 2 || hour == 10 || hour == 12 || hour == 13;
-  }
+  String _yyyymmdd(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
-  String _customerFor(int hour) {
-    const names = ['Trần Minh', 'Saigon FC', 'Lê Hà', 'Pickleball Group'];
-    return names[hour % names.length];
+  /// Tìm booking phủ giờ `hour` (6..21) trong list bookings của ngày được chọn.
+  Booking? _bookingAt(List<Booking> all, int hour) {
+    final slotStart = DateTime(_date.year, _date.month, _date.day, hour);
+    final slotEnd = slotStart.add(const Duration(hours: 1));
+    for (final b in all) {
+      if (b.status == BookingStatus.cancelled) continue;
+      if (b.startsAt.isBefore(slotEnd) && b.endsAt.isAfter(slotStart)) {
+        return b;
+      }
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
+    final bookings = ref
+            .watch(staffScheduleProvider(date: _yyyymmdd(_date)))
+            .value ??
+        const <Booking>[];
     return SafeArea(
       child: Column(
         children: [
@@ -108,24 +124,25 @@ class _StaffScheduleTabState extends State<StaffScheduleTab> {
               itemCount: _hours.length,
               itemBuilder: (_, i) {
                 final hour = _hours[i];
-                final hasBooking = _hasBooking(i);
+                final b = _bookingAt(bookings, _hourStart + i);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: InkWell(
-                    onTap: hasBooking
-                        ? () => context.push(RoutePaths.staffBookingDetail('t3'))
+                    onTap: b != null
+                        ? () => context
+                            .push(RoutePaths.staffBookingDetail(b.id))
                         : null,
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
-                        color: hasBooking
+                        color: b != null
                             ? AppColors.primary.withValues(alpha: 0.08)
                             : AppColors.surfaceAlt,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: hasBooking
+                          color: b != null
                               ? AppColors.primary.withValues(alpha: 0.3)
                               : AppColors.border,
                         ),
@@ -140,7 +157,7 @@ class _StaffScheduleTabState extends State<StaffScheduleTab> {
                                     fontWeight: FontWeight.w800,
                                     fontSize: 13)),
                           ),
-                          if (hasBooking) ...[
+                          if (b != null) ...[
                             const Icon(Icons.check_circle,
                                 color: AppColors.primary, size: 16),
                             const SizedBox(width: 8),
@@ -149,12 +166,12 @@ class _StaffScheduleTabState extends State<StaffScheduleTab> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(_customerFor(i),
+                                  Text('#${b.code}',
                                       style: const TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: 13)),
                                   Text(
-                                    'Sân ${(i % 3) + 1}',
+                                    b.courtName,
                                     style: const TextStyle(
                                         color: AppColors.textMuted,
                                         fontSize: 11),
@@ -162,7 +179,7 @@ class _StaffScheduleTabState extends State<StaffScheduleTab> {
                                 ],
                               ),
                             ),
-                            const StatusBadge(status: BookingStatus.confirmed),
+                            StatusBadge(status: b.status),
                           ] else
                             const Expanded(
                               child: Text('Còn trống',

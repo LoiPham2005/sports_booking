@@ -1,59 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
+import '../customer/venues/presentation/providers/venue_detail_notifier.dart';
+import '../staff_portal/data/models/staff_portal_dtos.dart';
+import '../staff_portal/presentation/providers/staff_portal_notifier.dart';
 
-class StaffPricingPage extends StatefulWidget {
+class StaffPricingPage extends ConsumerWidget {
   const StaffPricingPage({super.key});
 
   @override
-  State<StaffPricingPage> createState() => _StaffPricingPageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final memberships = ref.watch(staffMembershipsProvider).value ?? const [];
+    if (memberships.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => safePop(context),
+          ),
+          title: const Text('Giá tạm thời'),
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Chưa có venue được gán. Liên hệ Owner để được phân quyền.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textMuted),
+            ),
+          ),
+        ),
+      );
+    }
 
-class _Override {
-  final String id;
-  final String court;
-  final String date;
-  final String timeRange;
-  final int price;
-  final String reason;
-  final String expiresIn;
-  const _Override({
-    required this.id,
-    required this.court,
-    required this.date,
-    required this.timeRange,
-    required this.price,
-    required this.reason,
-    required this.expiresIn,
-  });
-}
+    final venueId = memberships.first.venueId;
+    final asyncOverrides =
+        ref.watch(staffOverridesProvider(venueId: venueId));
+    final overrides = asyncOverrides.value ?? const <PriceOverrideDto>[];
 
-class _StaffPricingPageState extends State<StaffPricingPage> {
-  final _overrides = <_Override>[
-    const _Override(
-      id: 'o1',
-      court: 'Sân VIP',
-      date: 'Hôm nay',
-      timeRange: '17:00–19:00',
-      price: 600000,
-      reason: 'Khung giờ cao điểm',
-      expiresIn: '2 giờ',
-    ),
-    const _Override(
-      id: 'o2',
-      court: 'Tất cả sân',
-      date: 'CN 18/05',
-      timeRange: '06:00–08:00',
-      price: 250000,
-      reason: 'Giảm sốc sáng sớm',
-      expiresIn: '3 ngày',
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -69,7 +56,7 @@ class _StaffPricingPageState extends State<StaffPricingPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreate(context),
+        onPressed: () => _showCreate(context, ref, venueId),
         icon: const Icon(Icons.add),
         label: const Text('Tạo override'),
         backgroundColor: const Color(0xFF8B5CF6),
@@ -135,7 +122,7 @@ class _StaffPricingPageState extends State<StaffPricingPage> {
 
           const SizedBox(height: 20),
           Text(
-            'ĐANG ÁP DỤNG (${_overrides.length})',
+            'ĐANG ÁP DỤNG (${overrides.length})',
             style: const TextStyle(
               color: AppColors.textMuted,
               fontSize: 11,
@@ -144,10 +131,16 @@ class _StaffPricingPageState extends State<StaffPricingPage> {
             ),
           ),
           const SizedBox(height: 10),
-          if (_overrides.isEmpty)
-            _Empty(onCreate: () => _showCreate(context))
+          if (overrides.isEmpty)
+            _Empty(onCreate: () => _showCreate(context, ref, venueId))
           else
-            ..._overrides.map(_buildOverrideCard),
+            ...overrides.map((o) => _OverrideCard(
+                  item: o,
+                  onDelete: () => ref
+                      .read(
+                          staffOverridesProvider(venueId: venueId).notifier)
+                      .remove(o.id, venueId: venueId),
+                )),
 
           const SizedBox(height: 80),
         ],
@@ -155,7 +148,46 @@ class _StaffPricingPageState extends State<StaffPricingPage> {
     );
   }
 
-  Widget _buildOverrideCard(_Override o) {
+  void _showCreate(BuildContext context, WidgetRef ref, String venueId) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _CreateOverrideSheet(venueId: venueId),
+    );
+  }
+
+  void _showInfo(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        icon: const Icon(Icons.info_outline, color: Color(0xFF7C3AED)),
+        title: const Text('Override giá là gì?'),
+        content: const Text(
+          'Bạn có thể tạo giá tạm thời cho khung giờ cụ thể (vd: cao điểm cuối tuần, giảm giá sáng sớm). '
+          'Override này áp dụng song song với bảng giá gốc và sẽ hết hiệu lực khi hết khoảng thời gian.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OverrideCard extends StatelessWidget {
+  final PriceOverrideDto item;
+  final VoidCallback onDelete;
+  const _OverrideCard({required this.item, required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -187,14 +219,14 @@ class _StaffPricingPageState extends State<StaffPricingPage> {
                   children: [
                     Expanded(
                       child: Text(
-                        o.court,
+                        item.court.name,
                         style: const TextStyle(
                             fontWeight: FontWeight.w800, fontSize: 14),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Text(
-                      formatVND(o.price),
+                      formatVND(item.price),
                       style: const TextStyle(
                           color: Color(0xFF7C3AED),
                           fontWeight: FontWeight.w800,
@@ -207,23 +239,23 @@ class _StaffPricingPageState extends State<StaffPricingPage> {
                   spacing: 4,
                   runSpacing: 4,
                   children: [
-                    _miniTag(o.date),
-                    _miniTag(o.timeRange, mono: true),
-                    _miniTag('hết hạn ${o.expiresIn}',
-                        color: AppColors.warning),
+                    _miniTag(item.date),
+                    _miniTag('${item.startTime}–${item.endTime}', mono: true),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  o.reason,
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 12),
-                ),
+                if (item.reason != null && item.reason!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    item.reason!,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                ],
               ],
             ),
           ),
           IconButton(
-            onPressed: () => setState(() => _overrides.remove(o)),
+            onPressed: onDelete,
             icon: const Icon(Icons.delete_outline,
                 color: AppColors.danger, size: 20),
           ),
@@ -251,161 +283,204 @@ class _StaffPricingPageState extends State<StaffPricingPage> {
       ),
     );
   }
+}
 
-  void _showCreate(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          16,
-          20,
-          20 + MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  height: 4,
-                  width: 40,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const Text('Tạo override giá',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-              const SizedBox(height: 16),
-              const Text('Sân',
-                  style:
-                      TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                value: 'all',
-                decoration: const InputDecoration(isDense: true),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('Tất cả sân')),
-                  DropdownMenuItem(value: 'c1', child: Text('Sân 1')),
-                  DropdownMenuItem(value: 'c2', child: Text('Sân 2')),
-                  DropdownMenuItem(value: 'c3', child: Text('Sân VIP')),
-                ],
-                onChanged: (_) {},
-              ),
-              const SizedBox(height: 12),
-              const Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Từ giờ',
-                            style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700)),
-                        SizedBox(height: 6),
-                        TextField(
-                          decoration:
-                              InputDecoration(hintText: '17:00', isDense: true),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Đến giờ',
-                            style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700)),
-                        SizedBox(height: 6),
-                        TextField(
-                          decoration:
-                              InputDecoration(hintText: '19:00', isDense: true),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Text('Giá mới (₫/h)',
-                  style:
-                      TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              const TextField(
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: '600000',
-                  isDense: true,
-                  prefixIcon: Icon(Icons.payments_outlined, size: 18),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text('Lý do',
-                  style:
-                      TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              const TextField(
-                decoration: InputDecoration(
-                    hintText: 'Khung giờ cao điểm cuối tuần', isDense: true),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () {
-                  setState(() {
-                    _overrides.insert(
-                      0,
-                      _Override(
-                        id: 'o${_overrides.length + 1}',
-                        court: 'Sân VIP',
-                        date: 'Hôm nay',
-                        timeRange: '17:00–19:00',
-                        price: 600000,
-                        reason: 'Khung giờ cao điểm',
-                        expiresIn: '2 giờ',
-                      ),
-                    );
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Đã tạo override giá')),
-                  );
-                },
-                child: const Text('Tạo'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+class _CreateOverrideSheet extends ConsumerStatefulWidget {
+  final String venueId;
+  const _CreateOverrideSheet({required this.venueId});
+
+  @override
+  ConsumerState<_CreateOverrideSheet> createState() =>
+      _CreateOverrideSheetState();
+}
+
+class _CreateOverrideSheetState extends ConsumerState<_CreateOverrideSheet> {
+  final _startCtl = TextEditingController(text: '17:00');
+  final _endCtl = TextEditingController(text: '19:00');
+  final _priceCtl = TextEditingController();
+  final _reasonCtl = TextEditingController();
+  String? _courtId;
+  DateTime _date = DateTime.now();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _startCtl.dispose();
+    _endCtl.dispose();
+    _priceCtl.dispose();
+    _reasonCtl.dispose();
+    super.dispose();
   }
 
-  void _showInfo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        icon: const Icon(Icons.info_outline, color: Color(0xFF7C3AED)),
-        title: const Text('Override giá là gì?'),
-        content: const Text(
-          'Bạn có thể tạo giá tạm thời cho khung giờ cụ thể (vd: cao điểm cuối tuần, giảm giá sáng sớm). '
-          'Override này áp dụng song song với bảng giá gốc và sẽ hết hiệu lực khi hết khoảng thời gian.',
-          textAlign: TextAlign.center,
+  String _yyyymmdd(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> _submit() async {
+    final price = int.tryParse(_priceCtl.text.trim());
+    if (_courtId == null || price == null || price <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chọn sân và nhập giá hợp lệ')),
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    await ref
+        .read(staffOverridesProvider(venueId: widget.venueId).notifier)
+        .create(CreatePriceOverrideRequest(
+          courtId: _courtId!,
+          date: _yyyymmdd(_date),
+          startTime: _startCtl.text.trim(),
+          endTime: _endCtl.text.trim(),
+          price: price,
+          reason:
+              _reasonCtl.text.trim().isEmpty ? null : _reasonCtl.text.trim(),
+        ));
+    if (!mounted) return;
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = ref.watch(venueDetailProvider(widget.venueId)).value;
+    final courts = detail?.courts ?? const [];
+    _courtId ??= courts.isNotEmpty ? courts.first.id : null;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        16,
+        20,
+        20 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                height: 4,
+                width: 40,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const Text('Tạo override giá',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+            const SizedBox(height: 16),
+            const Text('Sân',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String>(
+              value: _courtId,
+              decoration: const InputDecoration(isDense: true),
+              items: courts
+                  .map((c) =>
+                      DropdownMenuItem(value: c.id, child: Text(c.name)))
+                  .toList(),
+              onChanged: (v) => setState(() => _courtId = v),
+            ),
+            const SizedBox(height: 12),
+            const Text('Ngày',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 90)),
+                );
+                if (picked != null) setState(() => _date = picked);
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  isDense: true,
+                  suffixIcon: Icon(Icons.calendar_today, size: 18),
+                ),
+                child: Text(_yyyymmdd(_date)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Từ giờ',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _startCtl,
+                        decoration: const InputDecoration(
+                            hintText: '17:00', isDense: true),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Đến giờ',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _endCtl,
+                        decoration: const InputDecoration(
+                            hintText: '19:00', isDense: true),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text('Giá mới (₫/h)',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _priceCtl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                hintText: '600000',
+                isDense: true,
+                prefixIcon: Icon(Icons.payments_outlined, size: 18),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('Lý do',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _reasonCtl,
+              decoration: const InputDecoration(
+                  hintText: 'Khung giờ cao điểm cuối tuần', isDense: true),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: _submitting ? null : _submit,
+              child: _submitting
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Tạo'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đã hiểu'),
-          ),
-        ],
       ),
     );
   }
