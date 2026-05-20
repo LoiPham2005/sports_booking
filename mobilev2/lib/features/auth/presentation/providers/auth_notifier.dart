@@ -136,6 +136,39 @@ class AuthNotifier extends _$AuthNotifier with BaseNotifier<UserDto?> {
         keepPreviousOnLoading: true,
       );
 
+  /// Update profile fields. UI gọi với map chỉ chứa field cần đổi.
+  Future<void> updateProfile({
+    String? fullName,
+    String? avatarUrl,
+    String? dob, // ISO date 'YYYY-MM-DD'
+    String? gender, // 'MALE' | 'FEMALE' | 'OTHER'
+    String? locale,
+  }) =>
+      runAsync(
+        action: () async {
+          final body = <String, dynamic>{};
+          if (fullName != null) body['fullName'] = fullName;
+          if (avatarUrl != null) body['avatarUrl'] = avatarUrl;
+          if (dob != null) body['dob'] = dob;
+          if (gender != null) body['gender'] = gender;
+          if (locale != null) body['locale'] = locale;
+
+          if (AppConfig.useMock) {
+            final current = state.value;
+            if (current == null) return current;
+            return current.copyWith(
+              fullName: fullName ?? current.fullName,
+              avatarUrl: avatarUrl ?? current.avatarUrl,
+              locale: locale ?? current.locale,
+            );
+          }
+          return _service.updateMe(body);
+        },
+        successMessage: 'Cập nhật thành công',
+        errorMessage: 'Cập nhật thất bại',
+        keepPreviousOnLoading: true,
+      );
+
   /// Best-effort logout — clear token kể cả khi API call fail.
   Future<void> logout() => runAsync(
         action: () async {

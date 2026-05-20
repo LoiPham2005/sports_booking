@@ -35,4 +35,9 @@ abstract class AuthService {
 
   @GET('/me')
   Future<UserDto> me();
+
+  /// `PATCH /me` — update profile.
+  /// Body chỉ truyền field cần đổi (fullName/avatarUrl/dob/gender/locale).
+  @PATCH('/me')
+  Future<UserDto> updateMe(@Body() Map<String, dynamic> body);
 }
