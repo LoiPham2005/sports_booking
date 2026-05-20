@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../shared/mock/mock_data.dart';
@@ -11,15 +12,17 @@ import '../../../shared/routing/route_paths.dart';
 import '../../../shared/routing/safe_pop.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/utils/format.dart';
+import '../sports/presentation/providers/sports_notifier.dart';
+import 'presentation/providers/venues_notifier.dart';
 
-class VenuesMapPage extends StatefulWidget {
+class VenuesMapPage extends ConsumerStatefulWidget {
   const VenuesMapPage({super.key});
 
   @override
-  State<VenuesMapPage> createState() => _VenuesMapPageState();
+  ConsumerState<VenuesMapPage> createState() => _VenuesMapPageState();
 }
 
-class _VenuesMapPageState extends State<VenuesMapPage> {
+class _VenuesMapPageState extends ConsumerState<VenuesMapPage> {
   final _mapController = MapController();
   final _searchController = TextEditingController();
   final _sheetController = DraggableScrollableController();
@@ -68,10 +71,14 @@ class _VenuesMapPageState extends State<VenuesMapPage> {
     super.dispose();
   }
 
+  /// Source list venues từ provider (API hoặc mock). Page filter client-side.
+  List<Venue> get _allVenues =>
+      ref.watch(venuesProvider).value ?? MockData.venues;
+
   List<Venue> get _filteredVenues {
-    return MockData.venues.where((v) {
-      // Has location
-      if (!MockData.venueLocations.containsKey(v.id)) return false;
+    return _allVenues.where((v) {
+      // Has location — ưu tiên venue.lat (từ API), fallback MockData.venueLocations.
+      if (_latLngFor(v) == null) return false;
       // Sport filter
       if (_selectedSport.isNotEmpty && !v.sports.contains(_selectedSport)) {
         return false;
@@ -99,9 +106,21 @@ class _VenuesMapPageState extends State<VenuesMapPage> {
     }).toList();
   }
 
+  /// Resolve lat/lng: ưu tiên `venue.lat/lng` (API), fallback
+  /// `MockData.venueLocations[id]` (mock data legacy).
+  LatLng? _latLngFor(Venue v) {
+    if (v.lat != null && v.lng != null) return LatLng(v.lat!, v.lng!);
+    final loc = MockData.venueLocations[v.id];
+    if (loc != null) return LatLng(loc.$1, loc.$2);
+    return null;
+  }
+
   LatLng _venueLatLng(String id) {
-    final loc = MockData.venueLocations[id]!;
-    return LatLng(loc.$1, loc.$2);
+    final v = _allVenues.firstWhere(
+      (x) => x.id == id,
+      orElse: () => MockData.venues.first,
+    );
+    return _latLngFor(v) ?? _initialCenter;
   }
 
   void _onMarkerTap(Venue v) {
@@ -157,7 +176,10 @@ class _VenuesMapPageState extends State<VenuesMapPage> {
   Widget build(BuildContext context) {
     final selected = _selectedVenueId == null
         ? null
-        : MockData.venues.firstWhere((v) => v.id == _selectedVenueId);
+        : _allVenues.firstWhere(
+            (v) => v.id == _selectedVenueId,
+            orElse: () => MockData.venues.first,
+          );
 
     return Scaffold(
       body: Stack(
@@ -486,34 +508,37 @@ class _VenuesMapPageState extends State<VenuesMapPage> {
                   ],
                 ),
               ),
-              // Sport chips
-              SizedBox(
-                height: 38,
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: MockData.sports.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(width: 6),
-                  itemBuilder: (_, i) {
-                    if (i == 0) {
+              // Sport chips — đọc từ provider, fallback MockData khi loading.
+              Builder(builder: (_) {
+                final sports = ref.watch(sportsProvider).value ?? MockData.sports;
+                return SizedBox(
+                  height: 38,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: sports.length + 1,
+                    separatorBuilder: (_, __) => const SizedBox(width: 6),
+                    itemBuilder: (_, i) {
+                      if (i == 0) {
+                        return _SportChip(
+                          label: 'Tất cả',
+                          emoji: '🎯',
+                          active: _selectedSport.isEmpty,
+                          onTap: () => setState(() => _selectedSport = ''),
+                        );
+                      }
+                      final s = sports[i - 1];
                       return _SportChip(
-                        label: 'Tất cả',
-                        emoji: '🎯',
-                        active: _selectedSport.isEmpty,
-                        onTap: () => setState(() => _selectedSport = ''),
+                        label: s.name,
+                        emoji: s.icon,
+                        active: _selectedSport == s.slug,
+                        onTap: () => setState(() => _selectedSport =
+                            _selectedSport == s.slug ? '' : s.slug),
                       );
-                    }
-                    final s = MockData.sports[i - 1];
-                    return _SportChip(
-                      label: s.name,
-                      emoji: s.icon,
-                      active: _selectedSport == s.slug,
-                      onTap: () => setState(
-                          () => _selectedSport = _selectedSport == s.slug ? '' : s.slug),
-                    );
-                  },
-                ),
-              ),
+                    },
+                  ),
+                );
+              }),
               const SizedBox(height: 8),
             ],
           ),

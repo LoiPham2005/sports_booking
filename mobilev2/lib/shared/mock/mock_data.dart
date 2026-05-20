@@ -20,6 +20,11 @@ class Venue {
   final String image;
   final List<String> amenities;
   final String description;
+  /// GPS — optional. Mock entries (MockData.venues) không set → fallback
+  /// `MockData.venueLocations[id]` lookup ở map page. API entries qua
+  /// `venueDtoToUi` adapter sẽ điền từ `VenueDto.lat/lng`.
+  final double? lat;
+  final double? lng;
 
   const Venue({
     required this.id,
@@ -35,6 +40,8 @@ class Venue {
     required this.image,
     required this.amenities,
     required this.description,
+    this.lat,
+    this.lng,
   });
 }
 

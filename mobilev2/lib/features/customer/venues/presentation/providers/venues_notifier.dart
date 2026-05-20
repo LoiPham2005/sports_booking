@@ -53,6 +53,8 @@ Venue venueDtoToUi(VenueDto dto) => Venue(
       image: _pickPrimaryImage(dto),
       amenities: dto.amenities.map((a) => a.slug).toList(),
       description: dto.description ?? '',
+      lat: dto.lat,
+      lng: dto.lng,
     );
 
 String _pickPrimaryImage(VenueDto dto) {
