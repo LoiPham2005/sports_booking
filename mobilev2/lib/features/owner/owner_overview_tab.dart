@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
@@ -8,16 +9,39 @@ import '../../shared/utils/format.dart';
 import '../../shared/widgets/kpi_card.dart';
 import '../../shared/widgets/revenue_sparkline.dart';
 import '../../shared/widgets/status_badge.dart';
+import '../customer/bookings/presentation/providers/bookings_notifier.dart';
+import 'dashboard/presentation/providers/owner_dashboard_notifier.dart';
 
-class OwnerOverviewTab extends StatelessWidget {
+class OwnerOverviewTab extends ConsumerWidget {
   const OwnerOverviewTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final upcoming = MockData.bookingsToday.firstWhere(
-      (b) => b.startsAt.isAfter(DateTime.now()),
-      orElse: () => MockData.bookingsToday.last,
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncDashboard = ref.watch(ownerDashboardProvider);
+    final dashboard = asyncDashboard.value;
+
+    // Adapter DTO → UI Booking để widget có sẵn (StatusBadge, _UpcomingTile) dùng được luôn.
+    final recentBookings =
+        (dashboard?.recentBookings ?? const []).map(bookingDtoToUi).toList();
+
+    final upcoming = recentBookings.isNotEmpty
+        ? recentBookings.firstWhere(
+            (b) => b.startsAt.isAfter(DateTime.now()),
+            orElse: () => recentBookings.first,
+          )
+        : MockData.bookingsToday.first;
+
+    // Map TopCustomerDto → tuple để widget cũ dùng được (c.name/$2/$3).
+    final topCustomerList = dashboard?.topCustomers ?? const [];
+    final List<({String name, int bookings, int total})> _topCustomers =
+        topCustomerList.isNotEmpty
+            ? topCustomerList
+                .map((c) =>
+                    (name: c.name, bookings: c.bookings, total: c.total))
+                .toList()
+            : MockData.topCustomers
+                .map((t) => (name: t.$1, bookings: t.$2, total: t.$3))
+                .toList();
 
     return SafeArea(
       child: ListView(
@@ -52,7 +76,7 @@ class OwnerOverviewTab extends StatelessWidget {
                       const Text('Xin chào, Owner 👋',
                           style: TextStyle(
                               color: AppColors.textSecondary, fontSize: 12)),
-                      Text('Quản lý ${MockData.ownerVenues.length} venue',
+                      Text('Quản lý ${dashboard?.venueCount ?? 0} venue',
                           style: const TextStyle(
                               fontWeight: FontWeight.w700, fontSize: 16)),
                     ],
@@ -105,28 +129,28 @@ class OwnerOverviewTab extends StatelessWidget {
                 icon: Icons.account_balance_wallet_outlined,
                 color: AppColors.primary,
                 label: 'DOANH THU HÔM NAY',
-                value: formatVND(MockData.ownerKpi['revenueToday'] as int),
+                value: formatVND(dashboard?.revenueToday ?? 0),
                 trend: '+12% so với hôm qua',
               ),
               KpiCard(
                 icon: Icons.event_available_outlined,
                 color: AppColors.success,
                 label: 'BOOKING HÔM NAY',
-                value: '${MockData.ownerKpi['bookingsToday']}',
+                value: '${dashboard?.bookingsToday ?? 0}',
                 trend: '+3 mới',
               ),
               KpiCard(
                 icon: Icons.timeline_outlined,
                 color: AppColors.accent,
                 label: 'TỈ LỆ LẤP ĐẦY',
-                value: '${MockData.ownerKpi['occupancyToday']}%',
+                value: '${((dashboard?.occupancyToday ?? 0) * 100).toInt()}%',
                 trend: 'Trên TB ngành',
               ),
               KpiCard(
                 icon: Icons.star_outline,
                 color: AppColors.info,
                 label: 'RATING TUẦN',
-                value: '${MockData.ownerKpi['ratingAvg']} ⭐',
+                value: '${(dashboard?.ratingAvg ?? 0).toStringAsFixed(1)} ⭐',
                 trend: '24 đánh giá mới',
               ),
             ],
@@ -178,7 +202,7 @@ class OwnerOverviewTab extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                RevenueSparkline(data: MockData.revenueLast7Days),
+                RevenueSparkline(data: dashboard?.revenueLast7Days ?? const <int>[]),
                 const SizedBox(height: 6),
                 Row(
                   children: const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
@@ -212,14 +236,14 @@ class OwnerOverviewTab extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
-              children: MockData.topCustomers.asMap().entries.map((e) {
+              children: _topCustomers.asMap().entries.map((e) {
                 final i = e.key;
                 final c = e.value;
                 return Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    border: i == MockData.topCustomers.length - 1
+                    border: i == _topCustomers.length - 1
                         ? null
                         : const Border(
                             bottom: BorderSide(color: AppColors.border)),
@@ -230,7 +254,7 @@ class OwnerOverviewTab extends StatelessWidget {
                         backgroundColor:
                             AppColors.primary.withValues(alpha: 0.15),
                         radius: 18,
-                        child: Text(c.$1[0],
+                        child: Text(c.name[0],
                             style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.primary)),
@@ -241,16 +265,16 @@ class OwnerOverviewTab extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(c.$1,
+                            Text(c.name,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w700)),
-                            Text('${c.$2} booking',
+                            Text('${c.bookings} booking',
                                 style: const TextStyle(
                                     color: AppColors.textMuted, fontSize: 11)),
                           ],
                         ),
                       ),
-                      Text(formatVND(c.$3),
+                      Text(formatVND(c.total),
                           style: const TextStyle(fontWeight: FontWeight.w700)),
                     ],
                   ),
