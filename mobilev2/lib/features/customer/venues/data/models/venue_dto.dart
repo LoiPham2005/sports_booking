@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:sports_booking_mobile/features/customer/sports/data/models/sport_dto.dart';
+import 'package:sports_booking_mobile/features/customer/venues/data/models/court_dto.dart';
 
 part 'venue_dto.freezed.dart';
 part 'venue_dto.g.dart';
@@ -33,6 +34,9 @@ abstract class VenueDto with _$VenueDto {
     @Default([]) List<SportDto> sports,
     int? priceFrom,
     double? distance,
+    // Chỉ trả về ở endpoint detail (GET /venues/:idOrSlug).
+    @Default([]) List<CourtDto> courts,
+    int? reviewsCount,
   }) = _VenueDto;
 
   factory VenueDto.fromJson(Map<String, dynamic> json) =>

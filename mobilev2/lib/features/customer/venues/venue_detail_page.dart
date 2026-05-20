@@ -1,26 +1,51 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/routing/safe_pop.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../shared/mock/mock_data.dart';
+import '../../../shared/routing/safe_pop.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/utils/format.dart';
 import 'booking_matrix.dart';
+import 'presentation/providers/venue_detail_notifier.dart';
 
-class VenueDetailPage extends StatelessWidget {
+class VenueDetailPage extends ConsumerWidget {
   final String id;
   const VenueDetailPage({super.key, required this.id});
 
   @override
-  Widget build(BuildContext context) {
-    final venue = MockData.venues.firstWhere(
-      (v) => v.id == id,
-      orElse: () => MockData.venues.first,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncDetail = ref.watch(venueDetailProvider(id));
+
+    return asyncDetail.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        appBar: AppBar(leading: BackButton(onPressed: () => safePop(context))),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('Lỗi: $e',
+                style: const TextStyle(color: AppColors.danger)),
+          ),
+        ),
+      ),
+      data: (detail) => _buildContent(context, detail),
     );
-    final sportNames = venue.sports
-        .map((s) => MockData.sports.firstWhere((sp) => sp.slug == s).name)
-        .toList();
+  }
+
+  Widget _buildContent(BuildContext context, VenueDetail detail) {
+    final venue = detail.venue;
+    final sportNames = venue.sports.map((s) {
+      return MockData.sports
+          .firstWhere(
+            (sp) => sp.slug == s,
+            orElse: () => Sport(slug: s, name: s, icon: '🏟️', count: 0),
+          )
+          .name;
+    }).toList();
 
     return Scaffold(
       backgroundColor: Colors.white,

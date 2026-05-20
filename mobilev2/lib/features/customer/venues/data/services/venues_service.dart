@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
+import 'package:sports_booking_mobile/features/customer/venues/data/models/availability_dto.dart';
+import 'package:sports_booking_mobile/features/customer/venues/data/models/review_dto.dart';
 import 'package:sports_booking_mobile/features/customer/venues/data/models/venue_dto.dart';
 
 part 'venues_service.g.dart';
@@ -33,7 +35,23 @@ abstract class VenuesService {
   });
 
   /// GET /venues/:idOrSlug — detail (cả cuid và slug đều được).
-  /// Response include `courts[]`, `images[]`, `amenities[]`, `sports[]`.
+  /// Response include `courts[]`, `images[]`, `amenities[]`, `sports[]`,
+  /// `reviewsCount`.
   @GET('/venues/{idOrSlug}')
   Future<VenueDto> getVenue(@Path('idOrSlug') String idOrSlug);
+
+  /// GET /venues/:id/reviews?sort=recent|rating
+  @GET('/venues/{id}/reviews')
+  Future<List<ReviewDto>> getVenueReviews(
+    @Path('id') String venueId, {
+    @Query('sort') String? sort,
+  });
+
+  /// GET /venues/:id/availability?date=YYYY-MM-DD
+  /// Matrix courts × time-slots với price + status.
+  @GET('/venues/{id}/availability')
+  Future<AvailabilityDto> getVenueAvailability(
+    @Path('id') String venueId, {
+    @Query('date') required String date,
+  });
 }
