@@ -1,24 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
+import 'staff/presentation/providers/owner_staff_notifier.dart';
 
-class OwnerStaffInvitePage extends StatefulWidget {
+class OwnerStaffInvitePage extends ConsumerStatefulWidget {
   const OwnerStaffInvitePage({super.key});
 
   @override
-  State<OwnerStaffInvitePage> createState() => _OwnerStaffInvitePageState();
+  ConsumerState<OwnerStaffInvitePage> createState() =>
+      _OwnerStaffInvitePageState();
 }
 
-class _OwnerStaffInvitePageState extends State<OwnerStaffInvitePage> {
+class _OwnerStaffInvitePageState extends ConsumerState<OwnerStaffInvitePage> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _identifier = TextEditingController(); // email hoặc phone
   StaffRole _role = StaffRole.staff;
   String _venueId = MockData.ownerVenues.first.id;
   String _channel = 'email'; // email | sms
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -27,39 +31,48 @@ class _OwnerStaffInvitePageState extends State<OwnerStaffInvitePage> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        icon: Container(
-          height: 56,
-          width: 56,
-          decoration: BoxDecoration(
-            color: AppColors.success.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
+    setState(() => _submitting = true);
+    try {
+      await ref.read(ownerStaffProvider.notifier).invite(
+            email: _identifier.text.trim(),
+            venueId: _venueId,
+            role: _role == StaffRole.manager ? 'MANAGER' : 'STAFF',
+          );
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          icon: Container(
+            height: 56,
+            width: 56,
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const Icon(Icons.send, color: AppColors.success, size: 28),
           ),
-          alignment: Alignment.center,
-          child: const Icon(Icons.send, color: AppColors.success, size: 28),
-        ),
-        title: const Text('Đã gửi lời mời'),
-        content: Text(
-          _channel == 'email'
-              ? '${_identifier.text} sẽ nhận email kèm link tham gia. Trạng thái sẽ là "Chờ duyệt" tới khi họ chấp nhận.'
-              : '${_identifier.text} sẽ nhận SMS kèm mã OTP để xác thực.',
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.pop();
-            },
-            child: const Text('Đã hiểu'),
+          title: const Text('Đã gửi lời mời'),
+          content: Text(
+            '${_identifier.text} sẽ nhận email kèm link tham gia. Trạng thái sẽ là "Chờ duyệt" tới khi họ chấp nhận.',
+            textAlign: TextAlign.center,
           ),
-        ],
-      ),
-    );
+          actions: [
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.pop();
+              },
+              child: const Text('Đã hiểu'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -76,8 +89,15 @@ class _OwnerStaffInvitePageState extends State<OwnerStaffInvitePage> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: FilledButton.icon(
-            onPressed: _submit,
-            icon: const Icon(Icons.send_outlined, size: 18),
+            onPressed: _submitting ? null : _submit,
+            icon: _submitting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.send_outlined, size: 18),
             label: const Text('Gửi lời mời'),
           ),
         ),

@@ -1,27 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../shared/routing/safe_pop.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
+import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/slot_grid.dart';
+import 'owner_core/data/models/owner_dtos.dart';
+import 'owner_core/presentation/providers/owner_bookings_notifier.dart';
 
-class OwnerWalkInPage extends StatefulWidget {
+class OwnerWalkInPage extends ConsumerStatefulWidget {
   const OwnerWalkInPage({super.key});
 
   @override
-  State<OwnerWalkInPage> createState() => _OwnerWalkInPageState();
+  ConsumerState<OwnerWalkInPage> createState() => _OwnerWalkInPageState();
 }
 
-class _OwnerWalkInPageState extends State<OwnerWalkInPage> {
+class _OwnerWalkInPageState extends ConsumerState<OwnerWalkInPage> {
+  final _nameCtl = TextEditingController();
+  final _phoneCtl = TextEditingController();
   String _courtId = MockData.courts.first.id;
   DateTime _date = DateTime.now();
   List<String> _slots = [];
   String _payMethod = 'cash';
+  bool _submitting = false;
 
   Court get _court => MockData.courts.firstWhere((c) => c.id == _courtId);
   int get _total => _slots.length * _court.pricePerHour;
+
+  @override
+  void dispose() {
+    _nameCtl.dispose();
+    _phoneCtl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _create() async {
+    if (_slots.isEmpty) return;
+    setState(() => _submitting = true);
+    try {
+      // Parse first/last slot 'HH:MM' → ISO DateTime trên _date.
+      final firstH = int.parse(_slots.first.split(':').first);
+      final lastH = int.parse(_slots.last.split(':').first) + 1;
+      final start = DateTime(_date.year, _date.month, _date.day, firstH).toUtc();
+      final end = DateTime(_date.year, _date.month, _date.day, lastH).toUtc();
+
+      await ref.read(ownerBookingsProvider.notifier).createWalkIn(
+            CreateWalkInRequest(
+              courtId: _courtId,
+              startsAt: start.toIso8601String(),
+              endsAt: end.toIso8601String(),
+              total: _total,
+              customerName: _nameCtl.text.trim().isEmpty
+                  ? null
+                  : _nameCtl.text.trim(),
+              customerPhone: _phoneCtl.text.trim().isEmpty
+                  ? null
+                  : _phoneCtl.text.trim(),
+            ),
+          );
+      if (!mounted) return;
+      context.pop();
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,16 +103,15 @@ class _OwnerWalkInPageState extends State<OwnerWalkInPage> {
               const SizedBox(width: 16),
               Expanded(
                 child: FilledButton(
-                  onPressed: _slots.isEmpty
-                      ? null
-                      : () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Đã tạo booking thủ công.')),
-                          );
-                          context.pop();
-                        },
-                  child: const Text('Tạo booking'),
+                  onPressed: (_slots.isEmpty || _submitting) ? null : _create,
+                  child: _submitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Tạo booking'),
                 ),
               ),
             ],
@@ -80,17 +123,19 @@ class _OwnerWalkInPageState extends State<OwnerWalkInPage> {
         children: [
           // Customer info
           const _Section('Khách hàng'),
-          const TextField(
-            decoration: InputDecoration(
+          TextField(
+            controller: _nameCtl,
+            decoration: const InputDecoration(
               labelText: 'Tên khách',
               hintText: 'Vd: Trần Minh',
               prefixIcon: Icon(Icons.person_outline),
             ),
           ),
           const SizedBox(height: 10),
-          const TextField(
+          TextField(
+            controller: _phoneCtl,
             keyboardType: TextInputType.phone,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               labelText: 'Số điện thoại',
               hintText: '09xxxxxxxx',
               prefixIcon: Icon(Icons.phone_outlined),

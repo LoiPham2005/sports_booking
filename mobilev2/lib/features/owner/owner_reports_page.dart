@@ -1,25 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import '../../shared/routing/safe_pop.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
+import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/revenue_sparkline.dart';
+import 'reports/presentation/providers/owner_reports_notifier.dart';
 
-class OwnerReportsPage extends StatefulWidget {
+class OwnerReportsPage extends ConsumerStatefulWidget {
   const OwnerReportsPage({super.key});
 
   @override
-  State<OwnerReportsPage> createState() => _OwnerReportsPageState();
+  ConsumerState<OwnerReportsPage> createState() => _OwnerReportsPageState();
 }
 
-class _OwnerReportsPageState extends State<OwnerReportsPage> {
+class _OwnerReportsPageState extends ConsumerState<OwnerReportsPage> {
   int _range = 7; // 7 / 30
+
+  String _fmt(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
-    final total = MockData.revenueLast7Days.reduce((a, b) => a + b);
+    final now = DateTime.now();
+    final from = now.subtract(Duration(days: _range - 1));
+    final asyncReports = ref.watch(ownerReportsProvider(
+      from: _fmt(from),
+      to: _fmt(now),
+      groupBy: 'day',
+    ));
+    final reports = asyncReports.value;
+    final series = reports?.series.map((s) => s.total).toList() ??
+        MockData.revenueLast7Days;
+    final total = series.isEmpty
+        ? 0
+        : series.reduce((a, b) => a + b);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -77,7 +93,7 @@ class _OwnerReportsPageState extends State<OwnerReportsPage> {
                         fontWeight: FontWeight.w600)),
                 const SizedBox(height: 16),
                 RevenueSparkline(
-                  data: MockData.revenueLast7Days,
+                  data: series,
                   height: 130,
                 ),
                 const SizedBox(height: 6),

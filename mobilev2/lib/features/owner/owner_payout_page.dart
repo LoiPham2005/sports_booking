@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import '../../shared/routing/safe_pop.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
+import '../../shared/routing/safe_pop.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
+import 'payout/presentation/providers/owner_payout_notifier.dart';
 
-class OwnerPayoutPage extends StatelessWidget {
+class OwnerPayoutPage extends ConsumerWidget {
   const OwnerPayoutPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    const pendingAmount = 18450000;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncSummary = ref.watch(ownerPayoutProvider);
+    final summary = asyncSummary.value;
+    final pendingAmount = summary?.pendingAmount ?? 0;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -90,15 +93,15 @@ class OwnerPayoutPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(MockData.ownerBankAccount['bankName']!,
+                      Text(summary?.bankAccount?.bankCode ?? MockData.ownerBankAccount['bankName']!,
                           style: const TextStyle(
                               fontWeight: FontWeight.w700)),
-                      Text(MockData.ownerBankAccount['accountNumber']!,
+                      Text(summary?.bankAccount?.accountNumber ?? MockData.ownerBankAccount['accountNumber']!,
                           style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,
                               fontFamily: 'monospace')),
-                      Text(MockData.ownerBankAccount['accountHolder']!,
+                      Text(summary?.bankAccount?.accountHolder ?? MockData.ownerBankAccount['accountHolder']!,
                           style: const TextStyle(
                               color: AppColors.textMuted, fontSize: 11)),
                     ],

@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../shared/mock/mock_data.dart';
 import '../../shared/routing/route_paths.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/status_badge.dart';
+import 'owner_core/presentation/providers/owner_bookings_notifier.dart';
 
-class OwnerBookingsTab extends StatefulWidget {
+class OwnerBookingsTab extends ConsumerStatefulWidget {
   const OwnerBookingsTab({super.key});
 
   @override
-  State<OwnerBookingsTab> createState() => _OwnerBookingsTabState();
+  ConsumerState<OwnerBookingsTab> createState() => _OwnerBookingsTabState();
 }
 
-class _OwnerBookingsTabState extends State<OwnerBookingsTab> {
+class _OwnerBookingsTabState extends ConsumerState<OwnerBookingsTab> {
   String _filter = 'all';
 
   static const _filters = [
@@ -25,25 +27,27 @@ class _OwnerBookingsTabState extends State<OwnerBookingsTab> {
     ('cancelled', 'Đã huỷ'),
   ];
 
-  List<Booking> get _items {
-    final all = [...MockData.bookingsToday, ...MockData.bookings];
-    switch (_filter) {
-      case 'pending':
-        return all.where((b) => b.status == BookingStatus.pendingPayment).toList();
-      case 'confirmed':
-        return all.where((b) => b.status == BookingStatus.confirmed).toList();
-      case 'completed':
-        return all.where((b) => b.status == BookingStatus.completed).toList();
-      case 'cancelled':
-        return all.where((b) => b.status == BookingStatus.cancelled).toList();
-      default:
-        return all;
+  /// Map UI filter chip → BookingStatus DB string (cho query API).
+  /// 'all' / 'cancelled' (multi-value) → null + filter client-side.
+  String? _statusForApi() => switch (_filter) {
+        'pending' => 'PENDING_PAYMENT',
+        'confirmed' => 'CONFIRMED',
+        'completed' => 'COMPLETED',
+        _ => null,
+      };
+
+  List<Booking> _filterClient(List<Booking> list) {
+    if (_filter == 'cancelled') {
+      return list.where((b) => b.status == BookingStatus.cancelled).toList();
     }
+    return list;
   }
 
   @override
   Widget build(BuildContext context) {
-    final items = _items;
+    final asyncList = ref.watch(ownerBookingsProvider);
+    final rawItems = asyncList.value ?? const <Booking>[];
+    final items = _filterClient(rawItems);
     return SafeArea(
       child: Column(
         children: [
@@ -95,7 +99,12 @@ class _OwnerBookingsTabState extends State<OwnerBookingsTab> {
                 final f = _filters[i];
                 final active = _filter == f.$1;
                 return InkWell(
-                  onTap: () => setState(() => _filter = f.$1),
+                  onTap: () {
+                    setState(() => _filter = f.$1);
+                    ref.read(ownerBookingsProvider.notifier).apply(
+                          OwnerBookingsFilter(status: _statusForApi()),
+                        );
+                  },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
